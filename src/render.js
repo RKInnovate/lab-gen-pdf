@@ -79,69 +79,90 @@ const DEFS_PATH = path.resolve(__dirname, '..', 'data', 'analyte-defs.json');
 // Maximum concurrent renders. See the file-header note on why 8.
 const RENDER_CONCURRENCY = 8;
 
-/**
- * Resolve the four Roboto font files pdfmake ships with itself.
- *
- * The primary path is `pdfmake/examples/fonts/*.ttf`, which is what
- * the pdfmake README documents for server-side use. If that fails
- * (a future pdfmake version may reshuffle), we fall through to
- * `pdfmake/build/vfs_fonts.js`-adjacent paths before giving up with
- * a one-line error that names the installed pdfmake version so a
- * reviewer can tell instantly whether to bump or patch.
- *
- * @returns {{normal:string,bold:string,italics:string,bolditalics:string}}
- *   Absolute filesystem paths suitable for pdfmake's font descriptor.
- */
-function resolveRobotoFontPaths() {
-  // Try the documented examples directory first — this is where
-  // pdfmake 0.1.x and 0.2.x both place the Roboto TTFs.
-  const primaryFamily = [
-    ['normal', 'pdfmake/examples/fonts/Roboto-Regular.ttf'],
-    ['bold', 'pdfmake/examples/fonts/Roboto-Medium.ttf'],
-    ['italics', 'pdfmake/examples/fonts/Roboto-Italic.ttf'],
-    ['bolditalics', 'pdfmake/examples/fonts/Roboto-MediumItalic.ttf'],
-  ];
+// Filenames pdfmake's VFS uses for the bundled Roboto family. The
+// names are stable across the 0.1.x / 0.2.x line and double as the
+// keys we look up inside vfs_fonts.js.
+const ROBOTO_FILES = {
+  normal: 'Roboto-Regular.ttf',
+  bold: 'Roboto-Medium.ttf',
+  italics: 'Roboto-Italic.ttf',
+  bolditalics: 'Roboto-MediumItalic.ttf',
+};
 
+/**
+ * Resolve the four Roboto font sources pdfmake ships with itself,
+ * in a shape suitable for `new PdfPrinter({ Roboto: ... })`.
+ *
+ * pdfmake@0.2.x no longer ships raw `.ttf` files inside the npm
+ * package — Roboto is embedded as base64 strings in
+ * `build/vfs_fonts.js`. PdfPrinter's font descriptors accept
+ * `Buffer` values in addition to filesystem paths (pdfkit, the
+ * underlying engine, registers either), so we decode the VFS once
+ * at startup and hand pdfmake Buffers directly. This works
+ * regardless of node_modules layout (hoisted, pnpm-isolated,
+ * workspaces) because we resolve the VFS module via `require`,
+ * not by guessing a relative path.
+ *
+ * The optional first path tries raw `examples/fonts/*.ttf` for
+ * forward-compat — if a future pdfmake version ships the TTFs
+ * directly again, we'll prefer the on-disk form (saves the base64
+ * decode + buffer allocation on every startup).
+ *
+ * @returns {{normal:Buffer|string,bold:Buffer|string,
+ *           italics:Buffer|string,bolditalics:Buffer|string}}
+ *   File paths if raw TTFs are present, otherwise Buffers of
+ *   decoded font bytes — either is a valid pdfmake font source.
+ */
+function resolveRobotoFonts() {
+  // Optional fast path: raw TTFs (pdfmake 0.1.x / hypothetical
+  // future major). Skip silently if missing; the VFS path below
+  // is the documented 0.2.x location.
   try {
-    const resolved = {};
-    for (const [key, spec] of primaryFamily) {
-      resolved[key] = require.resolve(spec);
-    }
-    return resolved;
-  } catch (primaryErr) {
-    // Some downstream bundles strip the `examples/` directory. The
-    // fonts also ship inside `build/vfs_fonts.js` as base64, but we
-    // need on-disk files for the server-side PdfPrinter. Try the
-    // alternate `build/`-relative location before failing loudly.
-    const fallbackFamily = [
-      ['normal', 'pdfmake/build/Roboto-Regular.ttf'],
-      ['bold', 'pdfmake/build/Roboto-Medium.ttf'],
-      ['italics', 'pdfmake/build/Roboto-Italic.ttf'],
-      ['bolditalics', 'pdfmake/build/Roboto-MediumItalic.ttf'],
-    ];
-    try {
-      const resolved = {};
-      for (const [key, spec] of fallbackFamily) {
-        resolved[key] = require.resolve(spec);
-      }
-      return resolved;
-    } catch (_fallbackErr) {
-      // Surface the installed version so the reviewer can pin or
-      // bump pdfmake without guessing.
-      let pdfmakeVersion = 'unknown';
-      try {
-        // eslint-disable-next-line global-require -- intentional, see above
-        pdfmakeVersion = require('pdfmake/package.json').version;
-      } catch {
-        // ignore; we already know the dependency is broken.
-      }
-      throw new Error(
-        `lab-pdf-gen: cannot locate Roboto fonts shipped with pdfmake@${pdfmakeVersion}. ` +
-          'Tried pdfmake/examples/fonts/ and pdfmake/build/. ' +
-          `Original error: ${primaryErr.message}`,
-      );
-    }
+    return {
+      normal: require.resolve(`pdfmake/examples/fonts/${ROBOTO_FILES.normal}`),
+      bold: require.resolve(`pdfmake/examples/fonts/${ROBOTO_FILES.bold}`),
+      italics: require.resolve(`pdfmake/examples/fonts/${ROBOTO_FILES.italics}`),
+      bolditalics: require.resolve(`pdfmake/examples/fonts/${ROBOTO_FILES.bolditalics}`),
+    };
+  } catch {
+    /* fall through to VFS */
   }
+
+  // Documented 0.2.x path: pdfmake/build/vfs_fonts.js exports a
+  // CommonJS object keyed by font filename → base64 payload.
+  let vfs;
+  try {
+    vfs = require('pdfmake/build/vfs_fonts.js');
+  } catch (err) {
+    let pdfmakeVersion = 'unknown';
+    try {
+      pdfmakeVersion = require('pdfmake/package.json').version;
+    } catch {
+      /* ignore — bigger problems if pdfmake itself is missing */
+    }
+    throw new Error(
+      `lab-pdf-gen: cannot load pdfmake's bundled Roboto fonts ` +
+        `(pdfmake@${pdfmakeVersion}). Tried raw TTF resolution and ` +
+        `pdfmake/build/vfs_fonts.js — both failed. Reinstall pdfmake ` +
+        `or pin a known-good version. Original: ${err.message}`,
+    );
+  }
+
+  const missing = Object.values(ROBOTO_FILES).filter((f) => !(f in vfs));
+  if (missing.length > 0) {
+    throw new Error(
+      `lab-pdf-gen: pdfmake VFS is present but missing Roboto entries: ` +
+        `${missing.join(', ')}. The VFS contract has shifted; pin pdfmake ` +
+        `to a version that still ships Roboto in vfs_fonts.js.`,
+    );
+  }
+
+  return {
+    normal: Buffer.from(vfs[ROBOTO_FILES.normal], 'base64'),
+    bold: Buffer.from(vfs[ROBOTO_FILES.bold], 'base64'),
+    italics: Buffer.from(vfs[ROBOTO_FILES.italics], 'base64'),
+    bolditalics: Buffer.from(vfs[ROBOTO_FILES.bolditalics], 'base64'),
+  };
 }
 
 // Resolve fonts lazily so module import doesn't fail if pdfmake
@@ -149,7 +170,7 @@ function resolveRobotoFontPaths() {
 let cachedFontDescriptors = null;
 function getFontDescriptors() {
   if (!cachedFontDescriptors) {
-    cachedFontDescriptors = { Roboto: resolveRobotoFontPaths() };
+    cachedFontDescriptors = { Roboto: resolveRobotoFonts() };
   }
   return cachedFontDescriptors;
 }
