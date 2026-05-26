@@ -60,9 +60,13 @@ import { createRequire } from 'module';
 import PdfPrinter from 'pdfmake';
 
 import { buildDocDefinition as buildCbc } from './templates/cbc.js';
-import { buildDocDefinition as buildLipid } from './templates/lipid.js';
+import { buildDocDefinition as buildHba1c } from './templates/hba1c.js';
+import { buildDocDefinition as buildIron } from './templates/iron.js';
+import { buildDocDefinition as buildKft } from './templates/kft.js';
 import { buildDocDefinition as buildLft } from './templates/lft.js';
+import { buildDocDefinition as buildLipid } from './templates/lipid.js';
 import { buildDocDefinition as buildThyroid } from './templates/thyroid.js';
+import { buildDocDefinition as buildUrine } from './templates/urine.js';
 
 // `createRequire` gives us a CommonJS-style `require` inside an ESM
 // module. We use it purely for `require.resolve`, which is the only
@@ -88,6 +92,13 @@ const ROBOTO_FILES = {
   italics: 'Roboto-Italic.ttf',
   bolditalics: 'Roboto-MediumItalic.ttf',
 };
+
+// On-disk directory holding the vendored Noto Sans Devanagari TTFs
+// the bilingual (en + hi) layout needs to render Hindi script. The
+// files are committed into the repo so a fresh clone can render the
+// bilingual layout without any network access; `pnpm run setup:fonts`
+// re-fetches them if they go missing.
+const DEVANAGARI_TTF_DIR = path.resolve(__dirname, '..', 'assets', 'fonts');
 
 /**
  * Resolve the four Roboto font sources pdfmake ships with itself,
@@ -165,12 +176,63 @@ function resolveRobotoFonts() {
   };
 }
 
+/**
+ * Resolve the Noto Sans Devanagari font sources used by the
+ * bilingual (en + hi) layout. The TTFs are vendored into
+ * `assets/fonts/` so the generator works on a fresh clone without
+ * network access; if either file is missing we log a single warning
+ * and return `null`, which makes the bilingual layout fall back to
+ * Roboto (Devanagari glyphs will then render as box-tofu, but the
+ * Roboto-only panels keep working).
+ *
+ * Noto Sans Devanagari has no italic or bold-italic variant, so we
+ * alias `italics` → regular and `bolditalics` → bold. pdfmake
+ * tolerates these aliases — the engine only consults `italics` when
+ * a doc-definition explicitly requests italics, which the bilingual
+ * layout never does.
+ *
+ * @returns {?{normal:string,bold:string,italics:string,bolditalics:string}}
+ *   absolute paths to the four pdfmake font-source slots, or `null`
+ *   if the TTFs aren't on disk (caller should fall back to Roboto).
+ */
+function resolveDevanagariFonts() {
+  const regular = path.join(DEVANAGARI_TTF_DIR, 'NotoSansDevanagari-Regular.ttf');
+  const bold = path.join(DEVANAGARI_TTF_DIR, 'NotoSansDevanagari-Bold.ttf');
+  try {
+    // Sync access check is fine: this runs once at startup, before
+    // any render work begins, and the failure mode is a clear log.
+    fs.accessSync(regular);
+    fs.accessSync(bold);
+    return {
+      normal: regular,
+      bold: bold,
+      // Noto Sans Devanagari ships no italic / bold-italic — alias.
+      italics: regular,
+      bolditalics: bold,
+    };
+  } catch (err) {
+    console.warn(
+      `lab-pdf-gen: NotoSansDevanagari TTFs not found in ${DEVANAGARI_TTF_DIR}. ` +
+        `Bilingual layout will fall back to Roboto (Devanagari glyphs will appear as boxes). ` +
+        `Run \`pnpm run setup:fonts\` to re-fetch.`,
+    );
+    return null;
+  }
+}
+
 // Resolve fonts lazily so module import doesn't fail if pdfmake
 // isn't installed yet (e.g. linters that import this file).
 let cachedFontDescriptors = null;
 function getFontDescriptors() {
   if (!cachedFontDescriptors) {
-    cachedFontDescriptors = { Roboto: resolveRobotoFonts() };
+    const fonts = { Roboto: resolveRobotoFonts() };
+    // Devanagari is optional — only register the family if the TTFs
+    // are actually on disk. The bilingual layout checks for the
+    // 'NotoSansDevanagari' family at render time and falls back to
+    // Roboto when missing.
+    const dev = resolveDevanagariFonts();
+    if (dev) fonts.NotoSansDevanagari = dev;
+    cachedFontDescriptors = fonts;
   }
   return cachedFontDescriptors;
 }
@@ -206,19 +268,27 @@ export function createPrinter() {
  * Static imports (vs. dynamic) so the bundler / loader has a stable
  * graph and there is no async-import cost in the render hot path.
  *
- * @param {string} panel - one of 'cbc' | 'lipid' | 'lft' | 'thyroid'
+ * @param {string} panel - one of 'cbc' | 'hba1c' | 'iron' | 'kft' | 'lft' | 'lipid' | 'thyroid' | 'urine'
  * @returns {(report:object) => object} a `buildDocDefinition` fn
  */
 function templateFor(panel) {
   switch (panel) {
     case 'cbc':
       return buildCbc;
-    case 'lipid':
-      return buildLipid;
+    case 'hba1c':
+      return buildHba1c;
+    case 'iron':
+      return buildIron;
+    case 'kft':
+      return buildKft;
     case 'lft':
       return buildLft;
+    case 'lipid':
+      return buildLipid;
     case 'thyroid':
       return buildThyroid;
+    case 'urine':
+      return buildUrine;
     default:
       throw new Error(`lab-pdf-gen: unknown panel '${panel}'`);
   }

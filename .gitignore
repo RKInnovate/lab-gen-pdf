@@ -6,3 +6,10 @@ node_modules/
 # via test-sample/.gitkeep so scripts can drop into a known path.
 test-sample/*
 !test-sample/.gitkeep
+
+# Vendored Devanagari TTFs MUST be committed so a fresh clone can
+# render the bilingual layout without network access. If any future
+# broad rule starts ignoring `assets/`, this negation keeps the TTFs
+# (and the OFL license alongside them) tracked.
+!assets/fonts/*.ttf
+!assets/fonts/OFL.txt

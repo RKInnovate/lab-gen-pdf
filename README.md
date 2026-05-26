@@ -98,3 +98,28 @@ lab-pdf-gen/
 
 Filenames are unique even for recurring patients (the timestamp
 differs per follow-up), so a flat watch_dir won't collide.
+
+## Fonts
+
+Roboto (Apache 2.0) for Latin text is bundled by `pdfmake` itself —
+the renderer decodes it from `pdfmake/build/vfs_fonts.js` at startup.
+No external download required for the seven Latin-only layouts.
+
+The `bilingual-en-hi` layout additionally needs **Noto Sans Devanagari**
+(SIL Open Font License v1.1) for the Hindi script. Two TTFs are
+vendored under `assets/fonts/` and committed to the repo, so a fresh
+clone renders the bilingual layout without any network access. If
+they go missing for any reason, re-fetch with:
+
+```bash
+pnpm run setup:fonts
+```
+
+The license text is at `assets/fonts/OFL.txt`. The font itself is
+copyrighted by The Noto Project Authors and used under OFL — see that
+file for full terms.
+
+If the Devanagari TTFs are absent at render time, the renderer logs
+a one-line warning and falls back to Roboto. Devanagari code points
+then render as `.notdef` boxes — visible but harmless; the other
+seven layouts continue to render normally.
