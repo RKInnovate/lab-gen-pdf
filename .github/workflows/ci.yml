@@ -41,35 +41,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Install pnpm BEFORE setup-node so the action's built-in
+      # pnpm-store cache picks up the version we're activating.
+      #
+      # We use the corepack shim that ships with Node (instead of
+      # pnpm/action-setup) because the latter's @v4 tag was force-
+      # moved upstream and the runner's cached SHA→tar resolution
+      # started returning 404 on codeload. Corepack is stable, in-
+      # tree, and resolves the `packageManager` field in package.json
+      # without an external action.
+      - name: Enable corepack + activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.10.0 --activate
+          pnpm --version
+
       # Node 22 LTS — matches the `engines.node >=20` declared in
       # package.json; pinned to the LTS line rather than `latest`
       # so a Node minor bump doesn't silently change CI semantics.
+      # `cache: pnpm` makes setup-node automatically warm the pnpm
+      # store from a hash of pnpm-lock.yaml.
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-
-      # pnpm 9 — pinned to match the `packageManager` field in
-      # package.json. corepack@4 has been finicky on Ubuntu runners,
-      # so we install pnpm directly via the action.
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: false
-
-      # Cache the pnpm store keyed on the lockfile so install is
-      # near-instant on cache hits. Misses (lockfile change) trigger
-      # a full fetch, which is ~5-8s for this dep set.
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          cache: "pnpm"
 
       # --frozen-lockfile: reject lockfile drift. If a contributor
       # bumps a dependency without committing the regenerated
