@@ -17,6 +17,13 @@ OCR + parsing paths. Output lands in `./test-sample/` (gitignored)
 labsense-agent --watch-dir ~/Projects/lab-pdf-gen/test-sample ...
 ```
 
+## Documentation
+
+- [docs/architecture.md](./docs/architecture.md) — pipeline, module map, data shapes
+- [docs/layouts.md](./docs/layouts.md) — the 8 visual layouts + how to add one
+- [docs/panels.md](./docs/panels.md) — the 8 clinical panels + every analyte
+- [docs/contributing.md](./docs/contributing.md) — coding standards, commit + branch conventions, CI gates
+
 ## Why this exists
 
 The agent's hot path is *watcher → SHA-256 → dedup → multipart
