@@ -1,0 +1,91 @@
+# PR / merge gate for the lab-pdf-gen Node generator. Runs on every
+# PR and every push to main. Three quick checks; nothing here takes
+# longer than a fresh-clone install (~30s with the pnpm store cache).
+#
+# We deliberately keep this minimal because:
+#   1. There is no test suite yet — the project ships a CLI that
+#      is verified by running it (the planned smoke-run step lands
+#      once the font-resolution fix is in main and known-green).
+#   2. There is no linter configured (no eslint/prettier in deps).
+#      Adding one is a future call; until then, `node --check` is
+#      our compile gate — it parses every source file and rejects
+#      anything that won't load.
+#   3. Heavy CI on a deterministic data-generator that never runs
+#      in production has very poor ROI; we'd rather burn CI minutes
+#      on the consumer repos (labsense-agent, LabSense-Health) that
+#      actually receive this output.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  # Stable, legible logs. CI=true is already in GitHub's env but
+  # made explicit here so the value can't drift.
+  CI: "true"
+  # Tell pnpm to use the workflow cache directory rather than ~/.pnpm-store
+  # so the cache action below actually hits.
+  PNPM_HOME: ${{ github.workspace }}/.pnpm-store
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install_and_syntax_check:
+    name: pnpm install + node --check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 LTS — matches the `engines.node >=20` declared in
+      # package.json; pinned to the LTS line rather than `latest`
+      # so a Node minor bump doesn't silently change CI semantics.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # pnpm 9 — pinned to match the `packageManager` field in
+      # package.json. corepack@4 has been finicky on Ubuntu runners,
+      # so we install pnpm directly via the action.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      # Cache the pnpm store keyed on the lockfile so install is
+      # near-instant on cache hits. Misses (lockfile change) trigger
+      # a full fetch, which is ~5-8s for this dep set.
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      # --frozen-lockfile: reject lockfile drift. If a contributor
+      # bumps a dependency without committing the regenerated
+      # lockfile, install fails here rather than silently picking a
+      # different version on every CI run.
+      - run: pnpm install --frozen-lockfile
+
+      # Parse every source file to catch syntax errors. This catches
+      # ~80% of the regressions a lint-only setup would catch, at a
+      # tiny fraction of the runtime, and adds zero dev-dependencies.
+      # `node --check` is the official syntax-only mode; it does not
+      # execute module side-effects, so it's safe across all files.
+      - name: Syntax check (node --check)
+        run: |
+          set -euo pipefail
+          # `find ... -print0 | xargs -0` is robust to paths with
+          # spaces. We scope to src/ to avoid scanning node_modules.
+          find src -type f -name '*.js' -print0 \
+            | xargs -0 -n1 -I{} node --check {}

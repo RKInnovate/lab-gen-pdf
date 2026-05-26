@@ -1,0 +1,167 @@
+name: "Branch name validation"
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  validate_branch_name:
+    runs-on: ubuntu-latest
+    # Skip validation for default branches and dependabot branches
+    if: |
+      github.ref != 'refs/heads/main' &&
+      github.ref != 'refs/heads/master' &&
+      github.ref != 'refs/heads/develop' &&
+      !startsWith(github.ref, 'refs/heads/dependabot/') &&
+      !startsWith(github.ref, 'refs/heads/renovate/')
+    steps:
+      - name: Validate branch name
+        uses: actions/github-script@v7
+        with:
+          script: |
+            /**
+             * This workflow validates that branch names follow the conventional commit format:
+             * - feat/description
+             * - fix/description
+             * - docs/description
+             * - chore/description
+             *
+             * Branches that don't follow this format will be flagged with an error.
+             */
+
+            // Get branch name based on event type
+            // For push events: use context.ref
+            // For pull_request events: use the head branch reference
+            const branchName = context.eventName === 'pull_request'
+              ? context.payload.pull_request.head.ref
+              : context.ref.replace('refs/heads/', '');
+
+            const validPrefixes = ['feat/', 'fix/', 'docs/', 'chore/', 'style/', 'refactor/', 'perf/', 'test/', 'build/', 'ci/', 'revert/'];
+
+            console.log(`Event: ${context.eventName}, Validating branch name: ${branchName}`);
+
+            // Check if branch name starts with a valid prefix
+            const isValid = validPrefixes.some(prefix => branchName.startsWith(prefix));
+
+            if (!isValid) {
+              const errorMessage = `
+              ❌ **Invalid Branch Name**
+
+              Branch name \`${branchName}\` does not follow the required naming convention.
+
+              ## Required Format
+
+              Branch names must start with one of these prefixes:
+
+              | Prefix | Purpose | Example |
+              |--------|---------|---------|
+              | \`feat/\` | New feature | \`feat/add-login\` |
+              | \`fix/\` | Bug fix | \`fix/auth-bug\` |
+              | \`docs/\` | Documentation | \`docs/update-readme\` |
+              | \`chore/\` | Maintenance | \`chore/update-deps\` |
+              | \`style/\` | Code style | \`style/format-code\` |
+              | \`refactor/\` | Refactoring | \`refactor/split-components\` |
+              | \`perf/\` | Performance | \`perf/optimize-queries\` |
+              | \`test/\` | Testing | \`test/add-unit-tests\` |
+              | \`build/\` | Build system | \`build/update-webpack\` |
+              | \`ci/\` | CI/CD | \`ci/add-workflow\` |
+              | \`revert/\` | Revert changes | \`revert/bad-commit\` |
+
+              ## How to Fix
+
+              1. **Rename your branch** to follow the naming convention:
+                 \`\`\`bash
+                 git branch -m ${branchName} <type>/<description>
+                 # Example: git branch -m ${branchName} feat/${branchName}
+                 \`\`\`
+
+              2. **Force push** to update the remote branch:
+                 \`\`\`bash
+                 git push origin -u <new-branch-name> --force
+                 \`\`\`
+
+              3. **Delete the old branch** from remote:
+                 \`\`\`bash
+                 git push origin --delete ${branchName}
+                 \`\`\`
+
+              ---
+
+              <sub>This check ensures all branches follow the organization's naming standards.</sub>
+              `;
+
+              core.setFailed(`Branch name '${branchName}' does not follow the required naming convention. Expected format: type/description (e.g., feat/add-login, fix/auth-bug)`);
+
+              // If this is a PR, post a comment with the error
+              if (context.eventName === 'pull_request') {
+                const prNumber = context.payload.pull_request.number;
+                const botCommentIdentifier = '<!-- branch-name-validation-bot -->';
+                const commentBody = botCommentIdentifier + '\n\n' + errorMessage;
+
+                // Find existing bot comment
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber
+                });
+
+                const existingComment = comments.find(comment =>
+                  comment.body && comment.body.includes(botCommentIdentifier)
+                );
+
+                if (existingComment) {
+                  // Update existing comment
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: existingComment.id,
+                    body: commentBody
+                  });
+                  console.log('Updated existing branch validation comment');
+                } else {
+                  // Create new comment
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    body: commentBody
+                  });
+                  console.log('Posted new branch validation comment');
+                }
+              }
+            } else {
+              console.log(`✅ Branch name '${branchName}' is valid`);
+
+              // If this is a PR and there was a previous error comment, delete it
+              if (context.eventName === 'pull_request') {
+                const prNumber = context.payload.pull_request.number;
+                const botCommentIdentifier = '<!-- branch-name-validation-bot -->';
+
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber
+                });
+
+                const existingComment = comments.find(comment =>
+                  comment.body && comment.body.includes(botCommentIdentifier)
+                );
+
+                if (existingComment) {
+                  await github.rest.issues.deleteComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: existingComment.id
+                  });
+                  console.log('Deleted previous branch validation error comment');
+                }
+              }
+            }

@@ -1,0 +1,179 @@
+name: "Commit message validation"
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate_commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const baseSha = context.payload.pull_request.base.sha;
+            const headSha = context.payload.pull_request.head.sha;
+
+            // Get all commits in the PR
+            const { data: commits } = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: baseSha,
+              head: headSha
+            });
+
+            const conventionalCommitPattern = /^(Merge|feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+/;
+            const errors = [];
+            const warnings = [];
+            const passed = [];
+
+            // Validate each commit message
+            for (const commit of commits.commits) {
+              const message = commit.commit.message.split('\n')[0]; // First line only
+              const shortSha = commit.sha.substring(0, 7);
+
+              if (!conventionalCommitPattern.test(message)) {
+                errors.push({
+                  sha: shortSha,
+                  message: message,
+                  issue: 'Does not follow conventional commit format'
+                });
+              } else {
+                passed.push(`✅ \`${shortSha}\`: ${message}`);
+              }
+
+              // Check length
+              if (message.length > 100) {
+                warnings.push({
+                  sha: shortSha,
+                  message: message,
+                  issue: `Too long (${message.length} characters, recommended: ≤ 100)`
+                });
+              }
+            }
+
+            // Generate report in table format
+            let commentBody = '## 🤖 Commit Message Validation Report\n\n';
+
+            // Summary table
+            const totalCommits = commits.commits.length;
+            const validCommits = totalCommits - errors.length;
+            const statusEmoji = errors.length > 0 ? '❌' : (warnings.length > 0 ? '⚠️' : '✅');
+            const statusText = errors.length > 0 ? 'Failed' : (warnings.length > 0 ? 'Passed with warnings' : 'All valid');
+
+            commentBody += '### Summary\n\n';
+            commentBody += '| Status | Total Commits | Valid | Invalid | Warnings |\n';
+            commentBody += '|--------|---------------|-------|---------|----------|\n';
+            commentBody += `| ${statusEmoji} **${statusText}** | ${totalCommits} | ${validCommits} | ${errors.length} | ${warnings.length} |\n\n`;
+
+            // Detailed results table
+            if (errors.length > 0 || warnings.length > 0 || passed.length > 0) {
+              commentBody += '### Commit Details\n\n';
+              commentBody += '| Status | SHA | Commit Message | Issue |\n';
+              commentBody += '|--------|-----|----------------|-------|\n';
+
+              // Add errors first
+              errors.forEach(error => {
+                const truncatedMsg = error.message.length > 60 ? error.message.substring(0, 57) + '...' : error.message;
+                commentBody += `| ❌ | \`${error.sha}\` | ${truncatedMsg} | ${error.issue} |\n`;
+              });
+
+              // Add warnings (commits with length issues)
+              warnings.forEach(warning => {
+                const truncatedMsg = warning.message.length > 60 ? warning.message.substring(0, 57) + '...' : warning.message;
+                commentBody += `| ⚠️ | \`${warning.sha}\` | ${truncatedMsg} | ${warning.issue} |\n`;
+              });
+
+              // Add passed commits (show first 5 only to keep table compact)
+              const passedToShow = passed.slice(0, 5);
+              passedToShow.forEach(check => {
+                const match = check.match(/`([^`]+)`: (.+)/);
+                if (match) {
+                  const sha = match[1];
+                  const msg = match[2];
+                  const truncatedMsg = msg.length > 60 ? msg.substring(0, 57) + '...' : msg;
+                  commentBody += `| ✅ | \`${sha}\` | ${truncatedMsg} | — |\n`;
+                }
+              });
+
+              if (passed.length > 5) {
+                commentBody += `| ✅ | ... | *${passed.length - 5} more valid commit(s)* | — |\n`;
+              }
+
+              commentBody += '\n';
+            }
+
+            // Help section for errors
+            if (errors.length > 0) {
+              commentBody += '<details>\n';
+              commentBody += '<summary>📖 <strong>How to fix invalid commit messages</strong></summary>\n\n';
+              commentBody += '**Expected format:** `type(scope): description`\n\n';
+              commentBody += '**Valid types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`\n\n';
+              commentBody += '**Examples:**\n';
+              commentBody += '- `feat(auth): add SSO login support`\n';
+              commentBody += '- `fix: resolve memory leak in cache`\n';
+              commentBody += '- `docs(readme): update installation steps`\n\n';
+              commentBody += '**Fix options:**\n';
+              commentBody += '1. Use `git rebase -i HEAD~N` to reword commit messages\n';
+              commentBody += '2. Squash commits into one with a valid message\n';
+              commentBody += '3. If using "Squash and merge", ensure PR title is valid (this is enforced separately)\n\n';
+              commentBody += '</details>\n\n';
+            }
+
+            commentBody += '---\n\n';
+
+            if (errors.length > 0) {
+              commentBody += '⚠️ **Note:** This is a warning only. If you\'re using "Squash and merge", the PR title will be used for the final commit (which is validated separately).\n\n';
+            }
+
+            commentBody += '<sub>This check validates that all commit messages follow conventional commit format.</sub>';
+
+            // Post/Update comment
+            const botCommentIdentifier = '<!-- commit-msg-validation-bot -->';
+            commentBody = botCommentIdentifier + '\n\n' + commentBody;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body && comment.body.includes(botCommentIdentifier)
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: commentBody
+              });
+              console.log('Updated existing commit validation comment');
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+              console.log('Posted new commit validation comment');
+            }
+
+            // Set check status (make it a warning, not a failure, since PR title will be used for merge)
+            if (errors.length > 0) {
+              core.warning(`Found ${errors.length} commit(s) with invalid messages. Please fix or ensure PR title is valid for squash merge.`);
+            } else {
+              console.log('✅ All commit messages are valid!');
+            }

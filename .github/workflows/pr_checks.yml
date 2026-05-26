@@ -1,0 +1,217 @@
+name: "PR checks"
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  validate_pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title and body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title || "";
+            const body = context.payload.pull_request.body || "";
+            const prNumber = context.payload.pull_request.number;
+
+            const errors = [];
+            const warnings = [];
+            const passed = [];
+
+            // ============================================
+            // 1. Validate PR Title (Conventional Commits)
+            // ============================================
+            const conventionalCommitPattern = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+/;
+
+            if (!conventionalCommitPattern.test(title)) {
+              errors.push({
+                type: 'title',
+                message: 'PR title does not follow conventional commit format',
+                details: 'Expected format: `type(scope): description`\n\nValid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n\nExamples:\n- `feat(auth): add SSO login support`\n- `fix: resolve memory leak in cache`\n- `docs(readme): update installation steps`'
+              });
+            } else {
+              passed.push('✅ PR title follows conventional commit format');
+            }
+
+            // Check title length
+            if (title.length > 100) {
+              warnings.push({
+                type: 'title',
+                message: 'PR title is too long',
+                details: `Title length: ${title.length} characters (recommended: ≤ 100)`
+              });
+            } else {
+              passed.push('✅ PR title length is appropriate');
+            }
+
+            // ============================================
+            // 2. Validate PR Body Sections
+            // ============================================
+            // Each entry's `pattern` accepts any of several heading
+            // synonyms the team uses interchangeably (e.g. `## Summary`
+            // and `## Description` for the same intent). Synonyms were
+            // expanded after PR #1 used the gh-cli default `## Summary`
+            // / `## Test plan` shape and would have been wrongly
+            // flagged by a stricter regex. Add new synonyms here when
+            // a PR-template variant introduces one — don't loosen to
+            // "anything counts".
+            const requiredSections = [
+              { pattern: /##?\s*(Description|Summary|Overview)/i, name: 'Description / Summary' },
+              { pattern: /##?\s*(How to test|Test plan|Tests?|QA|Verification)/i, name: 'How to test / QA' },
+              { pattern: /##?\s*Checklist/i, name: 'Checklist' },
+            ];
+
+            const missingSections = [];
+            for (const section of requiredSections) {
+              if (!section.pattern.test(body)) {
+                missingSections.push(section.name);
+              } else {
+                passed.push(`✅ Contains "${section.name}" section`);
+              }
+            }
+
+            if (missingSections.length > 0) {
+              errors.push({
+                type: 'body',
+                message: 'PR body is missing required sections',
+                details: `Missing sections:\n${missingSections.map(s => `- ${s}`).join('\n')}`
+              });
+            }
+
+            // Check for issue references
+            const issueRefPattern = /#\d+|fixes|closes|resolves/i;
+            if (!issueRefPattern.test(body)) {
+              warnings.push({
+                type: 'body',
+                message: 'No issue reference found',
+                details: 'Consider linking related issues using `Closes #123` or `Fixes #456`'
+              });
+            } else {
+              passed.push('✅ Contains issue reference');
+            }
+
+            // Check for empty description / summary. Pattern matches
+            // whichever synonym the PR body uses; if none match the
+            // regex above also flagged it as a missing required
+            // section, so we don't need to re-flag here.
+            const descriptionMatch = body.match(/##?\s*(?:Description|Summary|Overview)\s*\n\s*(.+?)(?=\n##|$)/is);
+            if (descriptionMatch) {
+              const description = descriptionMatch[1].trim();
+              if (description.length < 10) {
+                warnings.push({
+                  type: 'body',
+                  message: 'Description seems too short',
+                  details: 'Please provide a detailed description of your changes'
+                });
+              }
+            }
+
+            // ============================================
+            // 3. Generate Report in Table Format
+            // ============================================
+            const hasErrors = errors.length > 0;
+            const hasWarnings = warnings.length > 0;
+
+            let commentBody = '## 🤖 PR Validation Report\n\n';
+
+            // Summary table
+            const totalChecks = errors.length + warnings.length + passed.length;
+            const statusEmoji = hasErrors ? '❌' : (hasWarnings ? '⚠️' : '✅');
+            const statusText = hasErrors ? 'Failed' : (hasWarnings ? 'Passed with warnings' : 'All checks passed');
+
+            commentBody += '### Summary\n\n';
+            commentBody += '| Status | Total Checks | Errors | Warnings | Passed |\n';
+            commentBody += '|--------|--------------|--------|----------|--------|\n';
+            commentBody += `| ${statusEmoji} **${statusText}** | ${totalChecks} | ${errors.length} | ${warnings.length} | ${passed.length} |\n\n`;
+
+            // Detailed results table
+            if (errors.length > 0 || warnings.length > 0 || passed.length > 0) {
+              commentBody += '### Detailed Results\n\n';
+              commentBody += '| Status | Check | Details |\n';
+              commentBody += '|--------|-------|----------|\n';
+
+              // Add errors first
+              errors.forEach(error => {
+                const details = error.details.replace(/\n/g, '<br>');
+                commentBody += `| ❌ | **${error.message}** | ${details} |\n`;
+              });
+
+              // Add warnings
+              warnings.forEach(warning => {
+                const details = warning.details.replace(/\n/g, '<br>');
+                commentBody += `| ⚠️ | **${warning.message}** | ${details} |\n`;
+              });
+
+              // Add passed checks
+              passed.forEach(check => {
+                const checkText = check.replace('✅ ', '');
+                commentBody += `| ✅ | ${checkText} | — |\n`;
+              });
+
+              commentBody += '\n';
+            }
+
+            commentBody += '---\n\n';
+
+            if (hasErrors) {
+              commentBody += '### 📋 Next Steps\n\n';
+              commentBody += '1. ✏️ Update your PR title and/or description to address the errors above\n';
+              commentBody += '2. 🔄 The checks will automatically re-run when you make changes\n\n';
+            } else if (hasWarnings) {
+              commentBody += '💡 **Tip:** Consider addressing the warnings above to improve your PR quality.\n\n';
+            }
+
+            commentBody += '<sub>This check validates PR title format and ensures all required sections are present in the PR description.</sub>';
+
+            // ============================================
+            // 4. Post/Update Comment
+            // ============================================
+            const botCommentIdentifier = '<!-- pr-validation-bot -->';
+            commentBody = botCommentIdentifier + '\n\n' + commentBody;
+
+            // Find existing bot comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body && comment.body.includes(botCommentIdentifier)
+            );
+
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: commentBody
+              });
+              console.log('Updated existing validation comment');
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+              console.log('Posted new validation comment');
+            }
+
+            // ============================================
+            // 5. Set Check Status
+            // ============================================
+            if (hasErrors) {
+              const errorSummary = errors.map(e => e.message).join(', ');
+              core.setFailed(`PR validation failed: ${errorSummary}`);
+            } else {
+              console.log('✅ All PR validation checks passed!');
+            }
