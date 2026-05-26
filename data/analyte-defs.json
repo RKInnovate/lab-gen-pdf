@@ -2,7 +2,7 @@
   "_meta": {
     "purpose": "Per-panel analyte catalogue. Drives both random value generation in src/generators/analytes.js and the printed reference-range column in src/templates/*.js. Adding a new analyte here is sufficient to surface it in the rendered PDF; no template changes are required as long as the new entry fits an existing group.",
     "fields": {
-      "code": "stable identifier (kebab-case)",
+      "code": "stable identifier (kebab-case). Treat as load-bearing — computed-formula identifiers in analytes.js reference these.",
       "name": "display name as it should appear on the printed report",
       "unit": "measurement unit; printed verbatim",
       "precision": "decimal places used when rounding the random sample for display",
@@ -10,7 +10,14 @@
       "ranges": "reference interval as {male,female,common} → {low, high}; sex-specific entries take precedence when present, otherwise the 'common' fallback is used",
       "physMin": "physiological floor used when sampling 'low' values — never go below this, even if a low draw would otherwise produce a non-survivable number",
       "physMax": "physiological ceiling, same idea",
-      "computed": "if present, marks the analyte as derived from other analytes in the same panel; the value generator computes it from sibling samples instead of drawing independently"
+      "computed": "if present, marks the analyte as derived from other analytes in the same panel; the value generator computes it from sibling samples instead of drawing independently",
+      "kind": "optional. One of 'quantitative' | 'semi-quantitative' | 'qualitative'. Defaults to 'quantitative' when absent. Non-quantitative analytes (urine routine, microscopy) draw a string from `options` instead of a numeric sample. The sampler flags 'N' when the picked option is in `normalOptions`, otherwise 'H'.",
+      "options": "array of allowed display strings for qualitative / semi-quantitative analytes. Sampler picks uniformly across this list. Required when `kind` is 'qualitative' or 'semi-quantitative'.",
+      "normalOptions": "subset of `options` considered normal (sampler emits flag 'N' for these; any other pick gets 'H'). Required alongside `options`."
+    },
+    "notes": {
+      "ranges_provenance": "Reference intervals are drawn from common Indian-laboratory adult reporting conventions. Where literature varies, conservative wide ranges are used: ESR upper bounds, anti-TPO cutoffs, transferrin saturation, fructosamine, and apolipoprotein cutoffs are particularly assay-dependent and should be treated as approximate.",
+      "urine_semi_quant": "Urinalysis dipstick fields use the standard semi-quantitative {Negative, Trace, 1+, 2+, 3+, 4+} scale. Urobilinogen is unique in that 'Trace' is still considered normal — handled via per-analyte `normalOptions`."
     }
   },
 
@@ -100,6 +107,26 @@
             "ranges": { "common": { "low": 11.5, "high": 14.5 } },
             "physMin": 9.0,
             "physMax": 22.0
+          },
+          {
+            "code": "rdw_sd",
+            "name": "RDW-SD",
+            "unit": "fL",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 39.0, "high": 46.0 } },
+            "physMin": 30.0,
+            "physMax": 65.0
+          },
+          {
+            "code": "reticulocyte_pct",
+            "name": "Reticulocyte %",
+            "unit": "%",
+            "precision": 1,
+            "method": "Flow Cytometry",
+            "ranges": { "common": { "low": 0.5, "high": 2.5 } },
+            "physMin": 0.1,
+            "physMax": 12.0
           }
         ]
       },
@@ -127,6 +154,17 @@
             "physMax": 95.0
           },
           {
+            "code": "anc",
+            "name": "Absolute Neutrophil Count",
+            "unit": "10³/µL",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 1.8, "high": 7.7 } },
+            "physMin": 0.5,
+            "physMax": 25.0,
+            "computed": "wbc_times_neutrophils_pct"
+          },
+          {
             "code": "lymphocytes",
             "name": "Lymphocytes",
             "unit": "%",
@@ -135,6 +173,17 @@
             "ranges": { "common": { "low": 20.0, "high": 45.0 } },
             "physMin": 5.0,
             "physMax": 70.0
+          },
+          {
+            "code": "alc",
+            "name": "Absolute Lymphocyte Count",
+            "unit": "10³/µL",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 1.0, "high": 4.0 } },
+            "physMin": 0.3,
+            "physMax": 12.0,
+            "computed": "wbc_times_lymphocytes_pct"
           },
           {
             "code": "monocytes",
@@ -147,6 +196,17 @@
             "physMax": 18.0
           },
           {
+            "code": "amc",
+            "name": "Absolute Monocyte Count",
+            "unit": "10³/µL",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.1, "high": 0.9 } },
+            "physMin": 0.0,
+            "physMax": 3.5,
+            "computed": "wbc_times_monocytes_pct"
+          },
+          {
             "code": "eosinophils",
             "name": "Eosinophils",
             "unit": "%",
@@ -157,6 +217,17 @@
             "physMax": 20.0
           },
           {
+            "code": "aec",
+            "name": "Absolute Eosinophil Count",
+            "unit": "10³/µL",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.0, "high": 0.5 } },
+            "physMin": 0.0,
+            "physMax": 5.0,
+            "computed": "wbc_times_eosinophils_pct"
+          },
+          {
             "code": "basophils",
             "name": "Basophils",
             "unit": "%",
@@ -165,6 +236,17 @@
             "ranges": { "common": { "low": 0.0, "high": 2.0 } },
             "physMin": 0.0,
             "physMax": 5.0
+          },
+          {
+            "code": "abc",
+            "name": "Absolute Basophil Count",
+            "unit": "10³/µL",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.0, "high": 0.2 } },
+            "physMin": 0.0,
+            "physMax": 1.0,
+            "computed": "wbc_times_basophils_pct"
           }
         ]
       },
@@ -190,6 +272,76 @@
             "ranges": { "common": { "low": 7.5, "high": 11.5 } },
             "physMin": 5.0,
             "physMax": 15.0
+          },
+          {
+            "code": "pdw",
+            "name": "Platelet Distribution Width (PDW)",
+            "unit": "fL",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 9.0, "high": 17.0 } },
+            "physMin": 7.0,
+            "physMax": 24.0
+          },
+          {
+            "code": "p_lcr",
+            "name": "Platelet Large Cell Ratio (P-LCR)",
+            "unit": "%",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 13.0, "high": 43.0 } },
+            "physMin": 8.0,
+            "physMax": 60.0
+          },
+          {
+            "code": "pct",
+            "name": "Plateletcrit (PCT)",
+            "unit": "%",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.17, "high": 0.35 } },
+            "physMin": 0.05,
+            "physMax": 0.7
+          }
+        ]
+      },
+      {
+        "name": "Acute-Phase / Ratios",
+        "analytes": [
+          {
+            "code": "esr",
+            "name": "Erythrocyte Sedimentation Rate (ESR)",
+            "unit": "mm/hr",
+            "precision": 0,
+            "method": "Modified Westergren",
+            "ranges": {
+              "male": { "low": 0, "high": 15 },
+              "female": { "low": 0, "high": 20 }
+            },
+            "physMin": 0,
+            "physMax": 140
+          },
+          {
+            "code": "nlr",
+            "name": "Neutrophil-Lymphocyte Ratio (NLR)",
+            "unit": "ratio",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 1.0, "high": 3.5 } },
+            "physMin": 0.3,
+            "physMax": 30.0,
+            "computed": "anc_over_alc"
+          },
+          {
+            "code": "plr",
+            "name": "Platelet-Lymphocyte Ratio (PLR)",
+            "unit": "ratio",
+            "precision": 0,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 50, "high": 200 } },
+            "physMin": 20,
+            "physMax": 1500,
+            "computed": "platelets_over_alc"
           }
         ]
       }
@@ -260,6 +412,60 @@
             "computed": "triglycerides_over_5"
           },
           {
+            "code": "non_hdl",
+            "name": "Non-HDL Cholesterol",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0, "high": 130 } },
+            "physMin": 30,
+            "physMax": 350,
+            "computed": "total_chol_minus_hdl"
+          }
+        ]
+      },
+      {
+        "name": "Apolipoproteins",
+        "analytes": [
+          {
+            "code": "apo_a1",
+            "name": "Apolipoprotein A1",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Immunoturbidimetric",
+            "ranges": {
+              "male": { "low": 110, "high": 180 },
+              "female": { "low": 110, "high": 205 }
+            },
+            "physMin": 50,
+            "physMax": 280
+          },
+          {
+            "code": "apo_b",
+            "name": "Apolipoprotein B",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Immunoturbidimetric",
+            "ranges": { "common": { "low": 50, "high": 120 } },
+            "physMin": 30,
+            "physMax": 250
+          },
+          {
+            "code": "lipo_a",
+            "name": "Lipoprotein (a) — Lp(a)",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Immunoturbidimetric",
+            "ranges": { "common": { "low": 0, "high": 30 } },
+            "physMin": 0,
+            "physMax": 200
+          }
+        ]
+      },
+      {
+        "name": "Atherogenic Indices",
+        "analytes": [
+          {
             "code": "chol_hdl_ratio",
             "name": "Total Cholesterol / HDL Ratio",
             "unit": "ratio",
@@ -269,6 +475,42 @@
             "physMin": 1.0,
             "physMax": 12.0,
             "computed": "total_chol_over_hdl"
+          },
+          {
+            "code": "ldl_over_hdl",
+            "name": "LDL / HDL Ratio",
+            "unit": "ratio",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.0, "high": 3.5 } },
+            "physMin": 0.3,
+            "physMax": 12.0,
+            "computed": "ldl_over_hdl"
+          },
+          {
+            "code": "trig_over_hdl",
+            "name": "Triglyceride / HDL Ratio",
+            "unit": "ratio",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.0, "high": 3.5 } },
+            "physMin": 0.2,
+            "physMax": 20.0,
+            "computed": "triglycerides_over_hdl"
+          },
+          {
+            "code": "apo_b_over_a1",
+            "name": "ApoB / ApoA1 Ratio",
+            "unit": "ratio",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": {
+              "male": { "low": 0.0, "high": 0.9 },
+              "female": { "low": 0.0, "high": 0.8 }
+            },
+            "physMin": 0.2,
+            "physMax": 2.5,
+            "computed": "apo_b_over_apo_a1"
           }
         ]
       }
@@ -358,6 +600,16 @@
             "ranges": { "common": { "low": 5, "high": 55 } },
             "physMin": 2,
             "physMax": 800
+          },
+          {
+            "code": "ldh",
+            "name": "Lactate Dehydrogenase (LDH)",
+            "unit": "U/L",
+            "precision": 0,
+            "method": "IFCC (Lactate→Pyruvate)",
+            "ranges": { "common": { "low": 140, "high": 280 } },
+            "physMin": 80,
+            "physMax": 2000
           }
         ]
       },
@@ -405,6 +657,31 @@
             "physMin": 0.4,
             "physMax": 4.0,
             "computed": "albumin_over_globulin"
+          }
+        ]
+      },
+      {
+        "name": "Coagulation",
+        "analytes": [
+          {
+            "code": "pt",
+            "name": "Prothrombin Time (PT)",
+            "unit": "seconds",
+            "precision": 1,
+            "method": "Mechanical Clot Detection",
+            "ranges": { "common": { "low": 11.0, "high": 14.0 } },
+            "physMin": 9.0,
+            "physMax": 60.0
+          },
+          {
+            "code": "inr",
+            "name": "INR",
+            "unit": "ratio",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.8, "high": 1.2 } },
+            "physMin": 0.5,
+            "physMax": 8.0
           }
         ]
       }
@@ -468,6 +745,619 @@
             "ranges": { "common": { "low": 0.8, "high": 1.8 } },
             "physMin": 0.2,
             "physMax": 6.0
+          },
+          {
+            "code": "reverse_t3",
+            "name": "Reverse T3 (rT3)",
+            "unit": "ng/dL",
+            "precision": 1,
+            "method": "CLIA",
+            "ranges": { "common": { "low": 8.0, "high": 25.0 } },
+            "physMin": 3.0,
+            "physMax": 80.0
+          },
+          {
+            "code": "tbg",
+            "name": "Thyroid Binding Globulin (TBG)",
+            "unit": "µg/mL",
+            "precision": 1,
+            "method": "RIA",
+            "ranges": { "common": { "low": 16.0, "high": 24.0 } },
+            "physMin": 8.0,
+            "physMax": 60.0
+          }
+        ]
+      },
+      {
+        "name": "Thyroid Antibodies",
+        "analytes": [
+          {
+            "code": "anti_tpo",
+            "name": "Anti-Thyroid Peroxidase Antibodies (Anti-TPO)",
+            "unit": "IU/mL",
+            "precision": 1,
+            "method": "CLIA",
+            "ranges": { "common": { "low": 0.0, "high": 34.0 } },
+            "physMin": 0.0,
+            "physMax": 1500.0
+          },
+          {
+            "code": "anti_tg",
+            "name": "Anti-Thyroglobulin Antibodies (Anti-Tg)",
+            "unit": "IU/mL",
+            "precision": 1,
+            "method": "CLIA",
+            "ranges": { "common": { "low": 0.0, "high": 115.0 } },
+            "physMin": 0.0,
+            "physMax": 4000.0
+          }
+        ]
+      }
+    ]
+  },
+
+  "kft": {
+    "title": "Kidney Function Test (KFT)",
+    "department": "Biochemistry",
+    "specimen": "Serum + Plasma",
+    "groups": [
+      {
+        "name": "Renal Profile",
+        "analytes": [
+          {
+            "code": "urea",
+            "name": "Urea",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Urease-GLDH Kinetic",
+            "ranges": { "common": { "low": 15, "high": 45 } },
+            "physMin": 6,
+            "physMax": 300
+          },
+          {
+            "code": "bun",
+            "name": "Blood Urea Nitrogen (BUN)",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 7, "high": 20 } },
+            "physMin": 3,
+            "physMax": 140,
+            "computed": "urea_over_2_14"
+          },
+          {
+            "code": "creatinine",
+            "name": "Creatinine",
+            "unit": "mg/dL",
+            "precision": 2,
+            "method": "Jaffe Kinetic",
+            "ranges": {
+              "male": { "low": 0.7, "high": 1.3 },
+              "female": { "low": 0.6, "high": 1.1 }
+            },
+            "physMin": 0.3,
+            "physMax": 15.0
+          },
+          {
+            "code": "uric_acid",
+            "name": "Uric Acid",
+            "unit": "mg/dL",
+            "precision": 1,
+            "method": "Uricase",
+            "ranges": {
+              "male": { "low": 3.4, "high": 7.0 },
+              "female": { "low": 2.4, "high": 5.7 }
+            },
+            "physMin": 1.0,
+            "physMax": 20.0
+          },
+          {
+            "code": "egfr",
+            "name": "Estimated GFR (eGFR)",
+            "unit": "mL/min/1.73m²",
+            "precision": 0,
+            "method": "CKD-EPI (Calculated)",
+            "ranges": { "common": { "low": 60, "high": 120 } },
+            "physMin": 5,
+            "physMax": 180,
+            "computed": "egfr_creatinine_age_sex"
+          }
+        ]
+      },
+      {
+        "name": "Electrolytes",
+        "analytes": [
+          {
+            "code": "sodium",
+            "name": "Sodium (Na+)",
+            "unit": "mEq/L",
+            "precision": 0,
+            "method": "ISE Indirect",
+            "ranges": { "common": { "low": 135, "high": 145 } },
+            "physMin": 110,
+            "physMax": 175
+          },
+          {
+            "code": "potassium",
+            "name": "Potassium (K+)",
+            "unit": "mEq/L",
+            "precision": 1,
+            "method": "ISE Indirect",
+            "ranges": { "common": { "low": 3.5, "high": 5.0 } },
+            "physMin": 2.0,
+            "physMax": 8.5
+          },
+          {
+            "code": "chloride",
+            "name": "Chloride (Cl-)",
+            "unit": "mEq/L",
+            "precision": 0,
+            "method": "ISE Indirect",
+            "ranges": { "common": { "low": 98, "high": 107 } },
+            "physMin": 75,
+            "physMax": 135
+          },
+          {
+            "code": "bicarbonate",
+            "name": "Bicarbonate (HCO3-)",
+            "unit": "mEq/L",
+            "precision": 0,
+            "method": "Enzymatic (PEPC)",
+            "ranges": { "common": { "low": 22, "high": 29 } },
+            "physMin": 8,
+            "physMax": 45
+          },
+          {
+            "code": "calcium",
+            "name": "Calcium (Total)",
+            "unit": "mg/dL",
+            "precision": 1,
+            "method": "Arsenazo III",
+            "ranges": { "common": { "low": 8.5, "high": 10.2 } },
+            "physMin": 5.0,
+            "physMax": 16.0
+          },
+          {
+            "code": "phosphorus",
+            "name": "Phosphorus (Inorganic)",
+            "unit": "mg/dL",
+            "precision": 1,
+            "method": "Molybdate UV",
+            "ranges": { "common": { "low": 2.5, "high": 4.5 } },
+            "physMin": 1.0,
+            "physMax": 12.0
+          },
+          {
+            "code": "magnesium",
+            "name": "Magnesium",
+            "unit": "mg/dL",
+            "precision": 1,
+            "method": "Xylidyl Blue",
+            "ranges": { "common": { "low": 1.7, "high": 2.4 } },
+            "physMin": 0.7,
+            "physMax": 6.0
+          }
+        ]
+      }
+    ]
+  },
+
+  "hba1c": {
+    "title": "HbA1c & Glycaemic Profile",
+    "department": "Biochemistry",
+    "specimen": "Whole Blood + Serum",
+    "groups": [
+      {
+        "name": "Glycaemic Markers",
+        "analytes": [
+          {
+            "code": "hba1c",
+            "name": "Glycated Haemoglobin (HbA1c)",
+            "unit": "%",
+            "precision": 1,
+            "method": "HPLC",
+            "ranges": { "common": { "low": 4.0, "high": 5.6 } },
+            "physMin": 3.0,
+            "physMax": 18.0
+          },
+          {
+            "code": "e_ag",
+            "name": "Estimated Average Glucose (eAG)",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Calculated (ADAG)",
+            "ranges": { "common": { "low": 70, "high": 126 } },
+            "physMin": 40,
+            "physMax": 500,
+            "computed": "hba1c_to_eag"
+          },
+          {
+            "code": "fbs",
+            "name": "Fasting Blood Sugar (FBS)",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Hexokinase",
+            "ranges": { "common": { "low": 70, "high": 100 } },
+            "physMin": 40,
+            "physMax": 600
+          },
+          {
+            "code": "ppbs",
+            "name": "Post-Prandial Blood Sugar (PPBS, 2-hr)",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Hexokinase",
+            "ranges": { "common": { "low": 70, "high": 140 } },
+            "physMin": 50,
+            "physMax": 700
+          },
+          {
+            "code": "random_glucose",
+            "name": "Random Blood Glucose",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Hexokinase",
+            "ranges": { "common": { "low": 70, "high": 140 } },
+            "physMin": 40,
+            "physMax": 800
+          },
+          {
+            "code": "fructosamine",
+            "name": "Fructosamine",
+            "unit": "µmol/L",
+            "precision": 0,
+            "method": "NBT Colorimetric",
+            "ranges": { "common": { "low": 200, "high": 285 } },
+            "physMin": 100,
+            "physMax": 600
+          },
+          {
+            "code": "microalbumin",
+            "name": "Microalbumin (Serum)",
+            "unit": "mg/L",
+            "precision": 1,
+            "method": "Immunoturbidimetric",
+            "ranges": { "common": { "low": 0.0, "high": 20.0 } },
+            "physMin": 0.0,
+            "physMax": 500.0
+          }
+        ]
+      }
+    ]
+  },
+
+  "iron": {
+    "title": "Iron Studies",
+    "department": "Biochemistry",
+    "specimen": "Serum",
+    "groups": [
+      {
+        "name": "Iron Profile",
+        "analytes": [
+          {
+            "code": "serum_iron",
+            "name": "Serum Iron",
+            "unit": "µg/dL",
+            "precision": 0,
+            "method": "Ferene-S Colorimetric",
+            "ranges": {
+              "male": { "low": 65, "high": 175 },
+              "female": { "low": 50, "high": 170 }
+            },
+            "physMin": 15,
+            "physMax": 500
+          },
+          {
+            "code": "tibc",
+            "name": "Total Iron Binding Capacity (TIBC)",
+            "unit": "µg/dL",
+            "precision": 0,
+            "method": "Direct Colorimetric",
+            "ranges": { "common": { "low": 240, "high": 450 } },
+            "physMin": 100,
+            "physMax": 800
+          },
+          {
+            "code": "uibc",
+            "name": "Unsaturated Iron Binding Capacity (UIBC)",
+            "unit": "µg/dL",
+            "precision": 0,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 150, "high": 375 } },
+            "physMin": 50,
+            "physMax": 700,
+            "computed": "tibc_minus_iron"
+          },
+          {
+            "code": "transferrin",
+            "name": "Transferrin",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Immunoturbidimetric",
+            "ranges": { "common": { "low": 200, "high": 360 } },
+            "physMin": 80,
+            "physMax": 600
+          },
+          {
+            "code": "transferrin_saturation",
+            "name": "Transferrin Saturation",
+            "unit": "%",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 20.0, "high": 50.0 } },
+            "physMin": 2.0,
+            "physMax": 100.0,
+            "computed": "serum_iron_times_100_over_tibc"
+          },
+          {
+            "code": "ferritin",
+            "name": "Ferritin",
+            "unit": "ng/mL",
+            "precision": 0,
+            "method": "CLIA",
+            "ranges": {
+              "male": { "low": 30, "high": 400 },
+              "female": { "low": 13, "high": 150 }
+            },
+            "physMin": 1,
+            "physMax": 5000
+          }
+        ]
+      }
+    ]
+  },
+
+  "urine": {
+    "title": "Urine Routine & Microscopy",
+    "department": "Clinical Pathology",
+    "specimen": "Urine — random midstream",
+    "groups": [
+      {
+        "name": "Physical Examination",
+        "analytes": [
+          {
+            "code": "colour",
+            "name": "Colour",
+            "unit": "",
+            "precision": 0,
+            "method": "Visual",
+            "kind": "qualitative",
+            "options": ["Pale Yellow", "Yellow", "Straw", "Dark Yellow", "Amber", "Red", "Brown"],
+            "normalOptions": ["Pale Yellow", "Yellow", "Straw"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "appearance",
+            "name": "Appearance",
+            "unit": "",
+            "precision": 0,
+            "method": "Visual",
+            "kind": "qualitative",
+            "options": ["Clear", "Slightly Turbid", "Turbid", "Cloudy"],
+            "normalOptions": ["Clear"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "specific_gravity",
+            "name": "Specific Gravity",
+            "unit": "",
+            "precision": 3,
+            "method": "Refractometer",
+            "kind": "quantitative",
+            "ranges": { "common": { "low": 1.005, "high": 1.030 } },
+            "physMin": 1.000,
+            "physMax": 1.060
+          },
+          {
+            "code": "ph",
+            "name": "pH",
+            "unit": "",
+            "precision": 1,
+            "method": "Dipstick (Indicator)",
+            "kind": "quantitative",
+            "ranges": { "common": { "low": 5.0, "high": 7.5 } },
+            "physMin": 4.5,
+            "physMax": 9.0
+          },
+          {
+            "code": "volume_ml",
+            "name": "Volume",
+            "unit": "mL",
+            "precision": 0,
+            "method": "Measured",
+            "kind": "quantitative",
+            "ranges": { "common": { "low": 30, "high": 150 } },
+            "physMin": 5,
+            "physMax": 500
+          }
+        ]
+      },
+      {
+        "name": "Chemical Examination",
+        "analytes": [
+          {
+            "code": "protein",
+            "name": "Protein",
+            "unit": "",
+            "precision": 0,
+            "method": "Dipstick",
+            "kind": "semi-quantitative",
+            "options": ["Negative", "Trace", "1+", "2+", "3+", "4+"],
+            "normalOptions": ["Negative"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "glucose",
+            "name": "Glucose",
+            "unit": "",
+            "precision": 0,
+            "method": "Dipstick (Glucose Oxidase)",
+            "kind": "semi-quantitative",
+            "options": ["Negative", "Trace", "1+", "2+", "3+", "4+"],
+            "normalOptions": ["Negative"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "ketones",
+            "name": "Ketones",
+            "unit": "",
+            "precision": 0,
+            "method": "Dipstick (Nitroprusside)",
+            "kind": "semi-quantitative",
+            "options": ["Negative", "Trace", "1+", "2+", "3+", "4+"],
+            "normalOptions": ["Negative"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "bilirubin",
+            "name": "Bilirubin",
+            "unit": "",
+            "precision": 0,
+            "method": "Dipstick (Diazo)",
+            "kind": "semi-quantitative",
+            "options": ["Negative", "Trace", "1+", "2+", "3+", "4+"],
+            "normalOptions": ["Negative"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "urobilinogen",
+            "name": "Urobilinogen",
+            "unit": "",
+            "precision": 0,
+            "method": "Dipstick (Ehrlich)",
+            "kind": "semi-quantitative",
+            "options": ["Negative", "Trace", "1+", "2+", "3+", "4+"],
+            "normalOptions": ["Negative", "Trace"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "nitrites",
+            "name": "Nitrites",
+            "unit": "",
+            "precision": 0,
+            "method": "Dipstick (Griess)",
+            "kind": "semi-quantitative",
+            "options": ["Negative", "Trace", "1+", "2+", "3+", "4+"],
+            "normalOptions": ["Negative"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "leucocyte_esterase",
+            "name": "Leucocyte Esterase",
+            "unit": "",
+            "precision": 0,
+            "method": "Dipstick (Esterase)",
+            "kind": "semi-quantitative",
+            "options": ["Negative", "Trace", "1+", "2+", "3+", "4+"],
+            "normalOptions": ["Negative"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "blood",
+            "name": "Blood / Haemoglobin",
+            "unit": "",
+            "precision": 0,
+            "method": "Dipstick (Peroxidase)",
+            "kind": "semi-quantitative",
+            "options": ["Negative", "Trace", "1+", "2+", "3+", "4+"],
+            "normalOptions": ["Negative"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "urinary_microalbumin",
+            "name": "Urinary Microalbumin",
+            "unit": "mg/L",
+            "precision": 1,
+            "method": "Immunoturbidimetric",
+            "kind": "quantitative",
+            "ranges": { "common": { "low": 0.0, "high": 20.0 } },
+            "physMin": 0.0,
+            "physMax": 500.0
+          }
+        ]
+      },
+      {
+        "name": "Microscopic Examination",
+        "analytes": [
+          {
+            "code": "urine_rbc",
+            "name": "RBCs",
+            "unit": "/HPF",
+            "precision": 0,
+            "method": "Microscopy",
+            "kind": "quantitative",
+            "ranges": { "common": { "low": 0, "high": 2 } },
+            "physMin": 0,
+            "physMax": 100
+          },
+          {
+            "code": "urine_wbc",
+            "name": "Pus Cells (WBCs)",
+            "unit": "/HPF",
+            "precision": 0,
+            "method": "Microscopy",
+            "kind": "quantitative",
+            "ranges": { "common": { "low": 0, "high": 5 } },
+            "physMin": 0,
+            "physMax": 200
+          },
+          {
+            "code": "epithelial_cells",
+            "name": "Epithelial Cells",
+            "unit": "/HPF",
+            "precision": 0,
+            "method": "Microscopy",
+            "kind": "qualitative",
+            "options": ["Few", "Occasional", "Many"],
+            "normalOptions": ["Few", "Occasional"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "casts",
+            "name": "Casts",
+            "unit": "/LPF",
+            "precision": 0,
+            "method": "Microscopy",
+            "kind": "qualitative",
+            "options": ["Nil", "Few hyaline", "Granular", "Cellular"],
+            "normalOptions": ["Nil", "Few hyaline"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "crystals",
+            "name": "Crystals",
+            "unit": "/HPF",
+            "precision": 0,
+            "method": "Microscopy",
+            "kind": "qualitative",
+            "options": ["Nil", "Calcium oxalate", "Uric acid", "Triple phosphate", "Cholesterol"],
+            "normalOptions": ["Nil"],
+            "physMin": 0,
+            "physMax": 0
+          },
+          {
+            "code": "bacteria",
+            "name": "Bacteria",
+            "unit": "/HPF",
+            "precision": 0,
+            "method": "Microscopy",
+            "kind": "qualitative",
+            "options": ["Nil", "Few", "Moderate", "Many"],
+            "normalOptions": ["Nil", "Few"],
+            "physMin": 0,
+            "physMax": 0
           }
         ]
       }
