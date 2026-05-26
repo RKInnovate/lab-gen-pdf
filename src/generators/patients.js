@@ -90,7 +90,16 @@ const REFERRING_DOCTORS = [
   'Dr. Rohit Saxena, MBBS, MS (Gen Surg)',
 ];
 
-const DEFAULT_PANEL_WEIGHTS = { cbc: 4, lipid: 3, lft: 2, thyroid: 2 };
+const DEFAULT_PANEL_WEIGHTS = {
+  cbc: 4,
+  lipid: 3,
+  lft: 2,
+  thyroid: 2,
+  kft: 2,
+  hba1c: 3,
+  iron: 1,
+  urine: 2,
+};
 
 // 18 months of history, in milliseconds. The recurring-patient
 // scheduler spreads visits across this window with a minimum
@@ -255,8 +264,8 @@ function randomSampleAndReportDate(rng, now) {
  * @param {number} args.uniqueFrac - fraction (0..1) of reports that should belong to one-off walk-ins
  * @param {number} args.recurringMin - minimum reports per recurring patient (inclusive)
  * @param {number} args.recurringMax - maximum reports per recurring patient (inclusive)
- * @param {string[]} args.panels - allowed panel slugs (e.g. ['cbc','lipid','lft','thyroid'])
- * @param {Record<string, number>} [args.panelWeights] - relative weights for panel selection; defaults to {cbc:4, lipid:3, lft:2, thyroid:2}
+ * @param {string[]} args.panels - allowed panel slugs across the 8 known panels (e.g. ['cbc','lipid','lft','thyroid','kft','hba1c','iron','urine'])
+ * @param {Record<string, number>} [args.panelWeights] - relative weights for panel selection; defaults to {cbc:4, lipid:3, lft:2, thyroid:2, kft:2, hba1c:3, iron:1, urine:2}
  * @returns {Array<object>} report shells (see file header for shape)
  */
 export function planReports({

@@ -39,7 +39,7 @@ import { loadDefs, createPrinter, renderAll } from './render.js';
 
 // All known panel slugs. Used both as the default --panels value
 // and as the validation whitelist when the user passes their own.
-const ALL_PANELS = ['cbc', 'lipid', 'lft', 'thyroid'];
+const ALL_PANELS = ['cbc', 'hba1c', 'iron', 'kft', 'lft', 'lipid', 'thyroid', 'urine'];
 
 // Defaults. Centralised so --help and the parser stay in sync.
 const DEFAULTS = Object.freeze({
@@ -78,8 +78,8 @@ function helpText() {
     `                            Override patient mix (default unique=${DEFAULTS.uniqueFrac},recurring=${(1 - DEFAULTS.uniqueFrac).toFixed(1)})`,
     `  --recurring-reports min=N,max=N`,
     `                            Reports per recurring patient (default min=${DEFAULTS.recurringMin},max=${DEFAULTS.recurringMax})`,
-    `  --panels cbc,lipid,lft,thyroid`,
-    `                            Panel filter (default all four)`,
+    `  --panels cbc,hba1c,iron,kft,lft,lipid,thyroid,urine`,
+    `                            Panel filter (default all eight)`,
     '  -h, --help                Show this help and exit',
     '',
     'Example:',
