@@ -69,25 +69,46 @@ follow-up reports across ~180 recurring patients.
 ## Layout
 
 ```
-lab-pdf-gen/
+lab-gen-pdf/
 ├── package.json
+├── assets/
+│   └── fonts/
+│       ├── NotoSansDevanagari-Regular.ttf   # bilingual-en-hi layout
+│       ├── NotoSansDevanagari-Bold.ttf
+│       └── OFL.txt                           # SIL Open Font License v1.1
 ├── data/
-│   └── analyte-defs.json   # ref ranges, units, precision per analyte
+│   └── analyte-defs.json    # 8 panels: cbc / lipid / lft / thyroid /
+│                            #          kft / hba1c / iron / urine
 ├── src/
-│   ├── index.js            # CLI entry
-│   ├── render.js           # patient+report → PDF buffer → disk
-│   ├── seedrand.js         # mulberry32 deterministic RNG
-│   ├── labs.js             # 4 fictitious lab brandings
+│   ├── index.js             # CLI entry (--count / --seed / --panels / ...)
+│   ├── render.js            # PdfPrinter setup, batched renderer, dispatch
+│   ├── seedrand.js          # mulberry32 deterministic RNG
+│   ├── labs.js              # 4 fictitious lab brandings
 │   ├── generators/
-│   │   ├── patients.js     # patient personas + recurring logic
-│   │   └── analytes.js     # range-aware value generation
-│   └── templates/
-│       ├── shared.js       # header / footer / patient block
+│   │   ├── patients.js      # patient mix + recurring + layoutKey assignment
+│   │   └── analytes.js      # range-aware + qualitative value generation
+│   ├── layouts/             # 8 visual layouts (pluggable; report.layoutKey
+│   │   │                    # picks one per Report at planning time)
+│   │   ├── index.js         # registry + pickLayout + layoutFor dispatch
+│   │   ├── corporate-clean.js
+│   │   ├── old-school-bordered.js
+│   │   ├── two-col-compact.js
+│   │   ├── letterhead-minimal.js
+│   │   ├── multi-col-grid.js
+│   │   ├── branded-modern-card.js
+│   │   ├── faxed-look.js
+│   │   └── bilingual-en-hi.js
+│   └── templates/           # 8 thin panel templates (clinical notes +
+│       │                    # dispatch to layoutFor(report.layoutKey))
 │       ├── cbc.js
 │       ├── lipid.js
 │       ├── lft.js
-│       └── thyroid.js
-└── test-sample/            # generated output (gitignored)
+│       ├── thyroid.js
+│       ├── kft.js
+│       ├── hba1c.js
+│       ├── iron.js
+│       └── urine.js
+└── test-sample/             # generated output (gitignored)
 ```
 
 ## Filename convention
