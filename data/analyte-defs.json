@@ -1,0 +1,476 @@
+{
+  "_meta": {
+    "purpose": "Per-panel analyte catalogue. Drives both random value generation in src/generators/analytes.js and the printed reference-range column in src/templates/*.js. Adding a new analyte here is sufficient to surface it in the rendered PDF; no template changes are required as long as the new entry fits an existing group.",
+    "fields": {
+      "code": "stable identifier (kebab-case)",
+      "name": "display name as it should appear on the printed report",
+      "unit": "measurement unit; printed verbatim",
+      "precision": "decimal places used when rounding the random sample for display",
+      "method": "optional, printed in the 'Method' column when present",
+      "ranges": "reference interval as {male,female,common} → {low, high}; sex-specific entries take precedence when present, otherwise the 'common' fallback is used",
+      "physMin": "physiological floor used when sampling 'low' values — never go below this, even if a low draw would otherwise produce a non-survivable number",
+      "physMax": "physiological ceiling, same idea",
+      "computed": "if present, marks the analyte as derived from other analytes in the same panel; the value generator computes it from sibling samples instead of drawing independently"
+    }
+  },
+
+  "cbc": {
+    "title": "Complete Blood Count (CBC)",
+    "department": "Haematology",
+    "specimen": "Whole Blood — EDTA",
+    "groups": [
+      {
+        "name": "Erythrocyte Profile",
+        "analytes": [
+          {
+            "code": "hgb",
+            "name": "Haemoglobin",
+            "unit": "g/dL",
+            "precision": 1,
+            "method": "Photometric",
+            "ranges": {
+              "male": { "low": 13.5, "high": 17.5 },
+              "female": { "low": 12.0, "high": 15.5 }
+            },
+            "physMin": 4.0,
+            "physMax": 22.0
+          },
+          {
+            "code": "rbc",
+            "name": "Total RBC Count",
+            "unit": "million/µL",
+            "precision": 2,
+            "method": "Electrical Impedance",
+            "ranges": {
+              "male": { "low": 4.5, "high": 5.9 },
+              "female": { "low": 4.0, "high": 5.2 }
+            },
+            "physMin": 1.5,
+            "physMax": 7.5
+          },
+          {
+            "code": "hct",
+            "name": "Haematocrit (PCV)",
+            "unit": "%",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": {
+              "male": { "low": 41.0, "high": 53.0 },
+              "female": { "low": 36.0, "high": 46.0 }
+            },
+            "physMin": 15.0,
+            "physMax": 65.0
+          },
+          {
+            "code": "mcv",
+            "name": "MCV",
+            "unit": "fL",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 80.0, "high": 100.0 } },
+            "physMin": 55.0,
+            "physMax": 125.0
+          },
+          {
+            "code": "mch",
+            "name": "MCH",
+            "unit": "pg",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 27.0, "high": 33.0 } },
+            "physMin": 18.0,
+            "physMax": 42.0
+          },
+          {
+            "code": "mchc",
+            "name": "MCHC",
+            "unit": "g/dL",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 32.0, "high": 36.0 } },
+            "physMin": 25.0,
+            "physMax": 40.0
+          },
+          {
+            "code": "rdw",
+            "name": "RDW-CV",
+            "unit": "%",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 11.5, "high": 14.5 } },
+            "physMin": 9.0,
+            "physMax": 22.0
+          }
+        ]
+      },
+      {
+        "name": "Leukocyte Profile",
+        "analytes": [
+          {
+            "code": "wbc",
+            "name": "Total WBC Count",
+            "unit": "10³/µL",
+            "precision": 2,
+            "method": "Electrical Impedance",
+            "ranges": { "common": { "low": 4.5, "high": 11.0 } },
+            "physMin": 1.0,
+            "physMax": 30.0
+          },
+          {
+            "code": "neutrophils",
+            "name": "Neutrophils",
+            "unit": "%",
+            "precision": 1,
+            "method": "VCS Technology",
+            "ranges": { "common": { "low": 40.0, "high": 75.0 } },
+            "physMin": 10.0,
+            "physMax": 95.0
+          },
+          {
+            "code": "lymphocytes",
+            "name": "Lymphocytes",
+            "unit": "%",
+            "precision": 1,
+            "method": "VCS Technology",
+            "ranges": { "common": { "low": 20.0, "high": 45.0 } },
+            "physMin": 5.0,
+            "physMax": 70.0
+          },
+          {
+            "code": "monocytes",
+            "name": "Monocytes",
+            "unit": "%",
+            "precision": 1,
+            "method": "VCS Technology",
+            "ranges": { "common": { "low": 2.0, "high": 10.0 } },
+            "physMin": 0.0,
+            "physMax": 18.0
+          },
+          {
+            "code": "eosinophils",
+            "name": "Eosinophils",
+            "unit": "%",
+            "precision": 1,
+            "method": "VCS Technology",
+            "ranges": { "common": { "low": 1.0, "high": 6.0 } },
+            "physMin": 0.0,
+            "physMax": 20.0
+          },
+          {
+            "code": "basophils",
+            "name": "Basophils",
+            "unit": "%",
+            "precision": 1,
+            "method": "VCS Technology",
+            "ranges": { "common": { "low": 0.0, "high": 2.0 } },
+            "physMin": 0.0,
+            "physMax": 5.0
+          }
+        ]
+      },
+      {
+        "name": "Platelet Profile",
+        "analytes": [
+          {
+            "code": "platelets",
+            "name": "Platelet Count",
+            "unit": "10³/µL",
+            "precision": 0,
+            "method": "Electrical Impedance",
+            "ranges": { "common": { "low": 150, "high": 450 } },
+            "physMin": 20,
+            "physMax": 900
+          },
+          {
+            "code": "mpv",
+            "name": "MPV",
+            "unit": "fL",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 7.5, "high": 11.5 } },
+            "physMin": 5.0,
+            "physMax": 15.0
+          }
+        ]
+      }
+    ]
+  },
+
+  "lipid": {
+    "title": "Lipid Profile",
+    "department": "Biochemistry",
+    "specimen": "Serum — Fasting",
+    "groups": [
+      {
+        "name": "Lipid Panel",
+        "analytes": [
+          {
+            "code": "total_chol",
+            "name": "Total Cholesterol",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Enzymatic (CHOD-PAP)",
+            "ranges": { "common": { "low": 0, "high": 200 } },
+            "physMin": 80,
+            "physMax": 400
+          },
+          {
+            "code": "triglycerides",
+            "name": "Triglycerides",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Enzymatic (GPO-PAP)",
+            "ranges": { "common": { "low": 0, "high": 150 } },
+            "physMin": 30,
+            "physMax": 800
+          },
+          {
+            "code": "hdl",
+            "name": "HDL Cholesterol",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Direct Homogenous",
+            "ranges": {
+              "male": { "low": 40, "high": 60 },
+              "female": { "low": 50, "high": 60 }
+            },
+            "physMin": 15,
+            "physMax": 110
+          },
+          {
+            "code": "ldl",
+            "name": "LDL Cholesterol",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Calculated (Friedewald)",
+            "ranges": { "common": { "low": 0, "high": 100 } },
+            "physMin": 20,
+            "physMax": 300,
+            "computed": "ldl_friedewald"
+          },
+          {
+            "code": "vldl",
+            "name": "VLDL Cholesterol",
+            "unit": "mg/dL",
+            "precision": 0,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 5, "high": 40 } },
+            "physMin": 2,
+            "physMax": 160,
+            "computed": "triglycerides_over_5"
+          },
+          {
+            "code": "chol_hdl_ratio",
+            "name": "Total Cholesterol / HDL Ratio",
+            "unit": "ratio",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.0, "high": 5.0 } },
+            "physMin": 1.0,
+            "physMax": 12.0,
+            "computed": "total_chol_over_hdl"
+          }
+        ]
+      }
+    ]
+  },
+
+  "lft": {
+    "title": "Liver Function Test (LFT)",
+    "department": "Biochemistry",
+    "specimen": "Serum",
+    "groups": [
+      {
+        "name": "Bilirubin Profile",
+        "analytes": [
+          {
+            "code": "tbili",
+            "name": "Bilirubin (Total)",
+            "unit": "mg/dL",
+            "precision": 2,
+            "method": "Diazo Method",
+            "ranges": { "common": { "low": 0.2, "high": 1.2 } },
+            "physMin": 0.1,
+            "physMax": 25.0
+          },
+          {
+            "code": "dbili",
+            "name": "Bilirubin (Direct)",
+            "unit": "mg/dL",
+            "precision": 2,
+            "method": "Diazo Method",
+            "ranges": { "common": { "low": 0.0, "high": 0.3 } },
+            "physMin": 0.0,
+            "physMax": 15.0
+          },
+          {
+            "code": "ibili",
+            "name": "Bilirubin (Indirect)",
+            "unit": "mg/dL",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 0.1, "high": 0.9 } },
+            "physMin": 0.0,
+            "physMax": 15.0,
+            "computed": "tbili_minus_dbili"
+          }
+        ]
+      },
+      {
+        "name": "Enzyme Profile",
+        "analytes": [
+          {
+            "code": "sgot",
+            "name": "SGOT (AST)",
+            "unit": "U/L",
+            "precision": 0,
+            "method": "IFCC (UV Kinetic)",
+            "ranges": { "common": { "low": 5, "high": 40 } },
+            "physMin": 2,
+            "physMax": 2000
+          },
+          {
+            "code": "sgpt",
+            "name": "SGPT (ALT)",
+            "unit": "U/L",
+            "precision": 0,
+            "method": "IFCC (UV Kinetic)",
+            "ranges": { "common": { "low": 5, "high": 45 } },
+            "physMin": 2,
+            "physMax": 2500
+          },
+          {
+            "code": "alp",
+            "name": "Alkaline Phosphatase",
+            "unit": "U/L",
+            "precision": 0,
+            "method": "Kinetic (DGKC)",
+            "ranges": { "common": { "low": 40, "high": 130 } },
+            "physMin": 20,
+            "physMax": 1200
+          },
+          {
+            "code": "ggt",
+            "name": "Gamma GT (GGT)",
+            "unit": "U/L",
+            "precision": 0,
+            "method": "Szasz Kinetic",
+            "ranges": { "common": { "low": 5, "high": 55 } },
+            "physMin": 2,
+            "physMax": 800
+          }
+        ]
+      },
+      {
+        "name": "Protein Profile",
+        "analytes": [
+          {
+            "code": "total_protein",
+            "name": "Total Protein",
+            "unit": "g/dL",
+            "precision": 1,
+            "method": "Biuret",
+            "ranges": { "common": { "low": 6.0, "high": 8.3 } },
+            "physMin": 3.0,
+            "physMax": 11.0
+          },
+          {
+            "code": "albumin",
+            "name": "Albumin",
+            "unit": "g/dL",
+            "precision": 1,
+            "method": "BCG",
+            "ranges": { "common": { "low": 3.5, "high": 5.0 } },
+            "physMin": 1.0,
+            "physMax": 6.5
+          },
+          {
+            "code": "globulin",
+            "name": "Globulin",
+            "unit": "g/dL",
+            "precision": 1,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 2.0, "high": 3.5 } },
+            "physMin": 1.0,
+            "physMax": 6.0,
+            "computed": "tp_minus_albumin"
+          },
+          {
+            "code": "ag_ratio",
+            "name": "A/G Ratio",
+            "unit": "ratio",
+            "precision": 2,
+            "method": "Calculated",
+            "ranges": { "common": { "low": 1.0, "high": 2.5 } },
+            "physMin": 0.4,
+            "physMax": 4.0,
+            "computed": "albumin_over_globulin"
+          }
+        ]
+      }
+    ]
+  },
+
+  "thyroid": {
+    "title": "Thyroid Profile (T3, T4, TSH)",
+    "department": "Immunoassay",
+    "specimen": "Serum",
+    "groups": [
+      {
+        "name": "Thyroid Hormones",
+        "analytes": [
+          {
+            "code": "t3",
+            "name": "Triiodothyronine (T3) — Total",
+            "unit": "ng/dL",
+            "precision": 0,
+            "method": "CLIA",
+            "ranges": { "common": { "low": 80, "high": 200 } },
+            "physMin": 20,
+            "physMax": 400
+          },
+          {
+            "code": "t4",
+            "name": "Thyroxine (T4) — Total",
+            "unit": "µg/dL",
+            "precision": 2,
+            "method": "CLIA",
+            "ranges": { "common": { "low": 5.0, "high": 12.0 } },
+            "physMin": 1.0,
+            "physMax": 25.0
+          },
+          {
+            "code": "tsh",
+            "name": "Thyroid Stimulating Hormone (TSH)",
+            "unit": "µIU/mL",
+            "precision": 3,
+            "method": "CLIA (3rd generation)",
+            "ranges": { "common": { "low": 0.4, "high": 4.0 } },
+            "physMin": 0.005,
+            "physMax": 100.0
+          },
+          {
+            "code": "ft3",
+            "name": "Free T3 (fT3)",
+            "unit": "pg/mL",
+            "precision": 2,
+            "method": "CLIA",
+            "ranges": { "common": { "low": 2.3, "high": 4.2 } },
+            "physMin": 0.8,
+            "physMax": 12.0
+          },
+          {
+            "code": "ft4",
+            "name": "Free T4 (fT4)",
+            "unit": "ng/dL",
+            "precision": 2,
+            "method": "CLIA",
+            "ranges": { "common": { "low": 0.8, "high": 1.8 } },
+            "physMin": 0.2,
+            "physMax": 6.0
+          }
+        ]
+      }
+    ]
+  }
+}
