@@ -34,6 +34,7 @@
  */
 
 import { pickLab } from '../labs.js';
+import { pickLayout } from '../layouts/index.js';
 
 // Indian first names split by sex. Kept intentionally short so the
 // recurring-patient set has overlap with the walk-in set — the
@@ -297,6 +298,11 @@ export function planReports({
       reportDate,
       registrationId,
       sampleId,
+      // Visual layout is independent of lab/panel — same lab can
+      // appear across multiple layouts in real life (template
+      // revisions, branch offices, partner-printed copies). Picked
+      // at planning time and stable for the report's lifetime.
+      layoutKey: pickLayout(rng),
     });
   }
 
@@ -375,6 +381,10 @@ export function planReports({
         reportDate,
         registrationId,
         sampleId,
+        // Each visit picks its layout independently — recurring
+        // patients realistically see template changes over time as
+        // labs revise their print stationery.
+        layoutKey: pickLayout(rng),
       });
     }
 

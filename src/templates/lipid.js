@@ -19,35 +19,27 @@
  *   caveat is unconditional, matching real-world reports.
  */
 
-import {
-  commonStyles,
-  defaultPageDefinition,
-  endorsementBlock,
-  headerBlock,
-  pageFooter,
-  panelTitleBar,
-  patientBlock,
-  resultsTable,
-} from './shared.js';
+import { layoutFor } from '../layouts/index.js';
 
 /**
  * Build the pdfmake docDefinition for a Lipid Profile report.
  *
- * @param {object} report — fully populated Report object
+ * @param {object} report — fully populated Report object (must carry layoutKey)
  * @returns {object} pdfmake docDefinition
  */
 export function buildDocDefinition(report) {
+  const layout = layoutFor(report.layoutKey);
   return {
-    ...defaultPageDefinition(),
+    ...layout.defaultPageDefinition(),
     header: () => ({
       margin: [40, 20, 40, 0],
-      stack: [headerBlock(report)],
+      stack: [layout.headerBlock(report)],
     }),
-    footer: pageFooter(report),
+    footer: layout.pageFooter(report),
     content: [
-      patientBlock(report),
-      panelTitleBar(report),
-      resultsTable(report),
+      layout.patientBlock(report),
+      layout.panelTitleBar(report),
+      layout.resultsTable(report),
       {
         margin: [0, 8, 0, 0],
         stack: [
@@ -64,8 +56,8 @@ export function buildDocDefinition(report) {
           },
         ],
       },
-      endorsementBlock(report),
+      layout.endorsementBlock(report),
     ],
-    styles: commonStyles(),
+    styles: layout.commonStyles(),
   };
 }

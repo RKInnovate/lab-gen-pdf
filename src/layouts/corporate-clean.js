@@ -1,30 +1,46 @@
 /**
- * Shared pdfmake content builders for synthetic Indian-style lab reports.
+ * Layout: Corporate Clean.
  *
  * # Purpose
- * Centralises the look-and-feel of the four panel templates (cbc, lipid, lft,
- * thyroid) so each panel template stays small and focused on its panel-specific
- * paragraphs. The builders here are deliberately stateless functions that take
- * a fully populated `Report` object (shape defined in PLAN.md / generators) and
- * return either pdfmake content nodes or factory callbacks (header / footer).
+ * The "default" visual layout — modern corporate-clinic look with an
+ * accent-colored monogram, two-column patient block, full-width
+ * results table with colored header row and zebra striping, and a
+ * compact endorsement / disclaimer footer. Drives layout #1 of the
+ * 8-layout pluggable layout system.
  *
  * # Role in the pipeline
- *   generators/* ──▶ Report ──▶ templates/<panel>.buildDocDefinition(report)
- *                                  │
- *                                  └─uses─▶ templates/shared.js (this file)
- *                                            │
- *                                            └─emits─▶ pdfmake docDefinition
+ *   generators/* ──▶ Report (with .layoutKey) ──▶ panel template
+ *                                                    │
+ *                                                    └─uses─▶ layouts/<layoutKey>.js (this file is one of 8)
+ *                                                              │
+ *                                                              └─emits─▶ pdfmake docDefinition
  *
- * # Design decisions
- * - We never import the analyte-defs JSON here; the Report object is already
- *   denormalised by the generator (group name, row display strings, flag,
- *   rangeDisplay, etc.). This keeps templates pure functions over Report.
- * - Method column is rendered iff at least one row in the report has a
- *   non-null `method`. Templates and the resultsTable builder agree on this
- *   rule so the table header and body row widths always match.
+ * # Layout interface (every layout MUST export these)
+ *   formatDate(d)                   → string
+ *   formatDateTime(d)               → string
+ *   commonStyles()                  → pdfmake styles object
+ *   defaultPageDefinition()         → partial docDefinition (pageSize, pageMargins, defaultStyle)
+ *   headerBlock(report)             → pdfmake content node — top-of-page lab letterhead
+ *   patientBlock(report)            → pdfmake content node — patient + sample metadata
+ *   panelTitleBar(report)           → pdfmake content node — panel title + dept + specimen
+ *   resultsTable(report)            → pdfmake content node — grouped results table
+ *   endorsementBlock(report)        → pdfmake content node — signature + disclaimer
+ *   pageFooter(report)              → (page, total) => content node — page footer factory
+ *
+ * Panel templates compose the layout's content nodes with a small
+ * panel-specific clinical-note paragraph in between resultsTable and
+ * endorsementBlock. The layout file therefore has zero knowledge of
+ * which panel is being rendered — it operates over the generic Report
+ * shape (groupedResults: [{name, rows: [{code, name, value, display,
+ * unit, method, rangeLow, rangeHigh, rangeDisplay, flag}]}]).
+ *
+ * # Design decisions (this layout)
  * - Accent colour for the lab is read from `report.patient.lab.accentColor`.
  *   It drives: header monogram, lab-name colour, horizontal rule, group
  *   subheader text, table header row fill, panel title bar.
+ * - Method column is rendered iff at least one row in the report has a
+ *   non-null `method`. Templates and the resultsTable builder agree on this
+ *   rule so the table header and body row widths always match.
  * - Default font is 'Roboto' — pdfmake's built-in default that the renderer
  *   registers with the standard VFS fonts. We never reference a font that
  *   pdfmake doesn't ship out of the box.

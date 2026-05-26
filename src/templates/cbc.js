@@ -25,16 +25,7 @@
  *   guidance even with the synthetic-data disclaimer.
  */
 
-import {
-  commonStyles,
-  defaultPageDefinition,
-  endorsementBlock,
-  headerBlock,
-  pageFooter,
-  panelTitleBar,
-  patientBlock,
-  resultsTable,
-} from './shared.js';
+import { layoutFor } from '../layouts/index.js';
 
 /**
  * Return true if any row in the report carries a non-normal flag.
@@ -64,6 +55,11 @@ function hasAbnormal(report) {
  *   doc.end();
  */
 export function buildDocDefinition(report) {
+  // Each Report carries the layoutKey assigned at planning time;
+  // panel templates never re-pick the layout, otherwise the same
+  // Report would produce different bytes across runs.
+  const layout = layoutFor(report.layoutKey);
+
   const interpretation = hasAbnormal(report)
     ? 'Some values are outside the reference range; clinical correlation '
       + 'with patient history and additional investigations is recommended.'
@@ -71,19 +67,19 @@ export function buildDocDefinition(report) {
       + 'significant haematological abnormality detected on this sample.';
 
   return {
-    ...defaultPageDefinition(),
+    ...layout.defaultPageDefinition(),
     // pdfmake calls `header` for every page; we keep the header simple (no
     // per-page conditionals) because the lab letterhead should repeat
     // identically on every printed page.
     header: () => ({
       margin: [40, 20, 40, 0],
-      stack: [headerBlock(report)],
+      stack: [layout.headerBlock(report)],
     }),
-    footer: pageFooter(report),
+    footer: layout.pageFooter(report),
     content: [
-      patientBlock(report),
-      panelTitleBar(report),
-      resultsTable(report),
+      layout.patientBlock(report),
+      layout.panelTitleBar(report),
+      layout.resultsTable(report),
       {
         margin: [0, 8, 0, 0],
         stack: [
@@ -95,8 +91,8 @@ export function buildDocDefinition(report) {
           },
         ],
       },
-      endorsementBlock(report),
+      layout.endorsementBlock(report),
     ],
-    styles: commonStyles(),
+    styles: layout.commonStyles(),
   };
 }
