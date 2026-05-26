@@ -1,0 +1,8 @@
+node_modules/
+*.log
+
+# Generated PDF output — ~2k files per full run, multi-MB total.
+# Regenerate locally; never commit. The directory itself is kept
+# via test-sample/.gitkeep so scripts can drop into a known path.
+test-sample/*
+!test-sample/.gitkeep

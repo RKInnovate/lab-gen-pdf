@@ -1,0 +1,24 @@
+{
+  "name": "lab-pdf-gen",
+  "version": "0.1.0",
+  "description": "Synthetic lab-report PDF generator for stress-testing the LabSense agent's watch/dedup/upload pipeline. Produces realistic Indian-style CBC / Lipid / LFT / Thyroid reports across multiple fictitious labs with a configurable patient mix.",
+  "license": "MIT",
+  "author": "Ravindra Singh <ravindra@budgurjar.org>",
+  "type": "module",
+  "main": "src/index.js",
+  "packageManager": "pnpm@9.10.0",
+  "bin": {
+    "lab-pdf-gen": "src/index.js"
+  },
+  "scripts": {
+    "generate": "node src/index.js",
+    "generate:smoke": "node src/index.js --count 20 --seed 42",
+    "generate:full": "node src/index.js --count 2000 --seed 42"
+  },
+  "dependencies": {
+    "pdfmake": "^0.2.10"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
