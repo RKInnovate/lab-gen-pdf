@@ -1,10 +1,17 @@
-# lab-pdf-gen — synthetic lab-report generator
+# lab-gen-pdf — synthetic lab-report generator
+
+[![CI](https://github.com/RKInnovate/lab-gen-pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/RKInnovate/lab-gen-pdf/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
+[![pdfmake](https://img.shields.io/badge/pdfmake-0.2-blue.svg)](https://pdfmake.github.io/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/RKInnovate/lab-gen-pdf/pulls)
 
 Generates realistic Indian-style lab-report PDFs (CBC, Lipid, LFT,
-Thyroid) for stress-testing the `labsense-agent` watch / dedup /
-upload pipeline and the `LabSense-Health` backend ingest path.
-Output lands in `./test-sample/` (gitignored) — point the agent's
-`watch_dir` at the absolute path:
+Thyroid, KFT, HbA1c, Iron Studies, Urine Routine) across multiple
+visual layouts, for stress-testing the `labsense-agent` watch /
+dedup / upload pipeline and the `LabSense-Health` backend ingest +
+OCR + parsing paths. Output lands in `./test-sample/` (gitignored)
+— point the agent's `watch_dir` at the absolute path:
 
 ```bash
 labsense-agent --watch-dir ~/Projects/lab-pdf-gen/test-sample ...
