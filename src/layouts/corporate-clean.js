@@ -332,6 +332,7 @@ export function patientBlock(report) {
             ['Age / Sex', `${patient.age} yrs / ${patient.sex === 'F' ? 'Female' : 'Male'}`],
             ['Patient ID', patient.id],
             ['MRN', patient.mrn],
+            ['Mobile', patient.phone],
           ]),
         ],
       },

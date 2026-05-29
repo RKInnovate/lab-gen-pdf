@@ -350,13 +350,14 @@ export function patientBlock(report) {
   const lab = report.patient.lab;
   const { patient, sampleDate, reportDate, registrationId, sampleId } = report;
 
-  // The 10-field flat list. Order is "who, then sample, then route" —
+  // The flat field list. Order is "who, then sample, then route" —
   // mirroring how a clinician would scan it.
   const fields = [
     ['Patient Name', patient.name],
     ['Age / Sex', `${patient.age} / ${patient.sex === 'F' ? 'Female' : 'Male'}`],
     ['Patient ID', patient.id],
     ['MRN', patient.mrn],
+    ['Mobile', patient.phone],
     ['Registration ID', registrationId],
     ['Sample ID', sampleId],
     ['Sample Date', formatDateTime(sampleDate)],

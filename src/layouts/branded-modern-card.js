@@ -415,6 +415,7 @@ export function patientBlock(report) {
               kvStack('Age / Sex', `${patient.age} yrs / ${patient.sex === 'F' ? 'Female' : 'Male'}`),
               kvStack('Patient ID', patient.id),
               kvStack('MRN', patient.mrn),
+              kvStack('Mobile', patient.phone),
               kvStack('Referring Doctor', patient.referringDoctor),
               kvStack('Lab', report.patient.lab.name),
             ],

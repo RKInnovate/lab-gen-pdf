@@ -73,6 +73,10 @@ function helpText() {
     'Options:',
     `  --count N                 Number of PDFs to emit (default ${DEFAULTS.count})`,
     `  --seed N                  Deterministic RNG seed (default ${DEFAULTS.seed})`,
+    `  --now TIMESTAMP           Anchor for all sample/report dates: epoch ms or`,
+    `                            an ISO-8601 string (default: current wall-clock).`,
+    `                            Pin --now together with --seed for byte-identical`,
+    `                            reruns.`,
     `  --out-dir PATH            Output directory (default ${DEFAULTS.outDir})`,
     `  --mix unique=F,recurring=F`,
     `                            Override patient mix (default unique=${DEFAULTS.uniqueFrac},recurring=${(1 - DEFAULTS.uniqueFrac).toFixed(1)})`,
@@ -124,6 +128,33 @@ function parseKvPairs(raw) {
 }
 
 /**
+ * Parse the `--now` flag value into a Date.
+ *
+ * Accepts either epoch milliseconds (an all-digits string) or any
+ * string the `Date` constructor understands (ISO-8601 is the
+ * recommended form, e.g. `2026-05-29T12:00:00Z`). Throws on a value
+ * that does not resolve to a valid date so the caller can surface a
+ * clear CLI error rather than silently anchoring every report to
+ * `Invalid Date`.
+ *
+ * @param {string} raw - the raw argument value
+ * @returns {Date} a valid Date
+ * @throws {Error} if `raw` is not epoch ms or a parseable date string
+ */
+function parseNow(raw) {
+  const trimmed = raw.trim();
+  // All-digits → treat as epoch milliseconds. Otherwise hand the
+  // string to Date (ISO-8601 etc.).
+  const d = /^\d+$/.test(trimmed) ? new Date(Number(trimmed)) : new Date(trimmed);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(
+      `--now must be epoch milliseconds or an ISO-8601 date (got '${raw}')`,
+    );
+  }
+  return d;
+}
+
+/**
  * Parse `process.argv.slice(2)` into a flat options object. Throws
  * `Error` on syntactic problems; semantic validation happens in
  * `validateOptions` against the resolved defaults.
@@ -142,6 +173,10 @@ function parseArgs(argv) {
     recurringMin: DEFAULTS.recurringMin,
     recurringMax: DEFAULTS.recurringMax,
     panels: DEFAULTS.panels.slice(),
+    // null → resolved to the current wall-clock in main(). A non-null
+    // value (set by --now) pins every sample/report date so a run is
+    // byte-reproducible across invocations.
+    now: null,
     help: false,
   };
 
@@ -174,6 +209,15 @@ function parseArgs(argv) {
     };
 
     switch (name) {
+      // A bare `--` is the conventional "end of runner options"
+      // separator. `pnpm run <script> -- <args>` (and the npm
+      // equivalent) forward it verbatim, so we skip it as a no-op
+      // rather than rejecting it as an unknown flag. This CLI has no
+      // positional arguments, so the flags that follow `--` are parsed
+      // normally — which is exactly what the forwarding pattern wants.
+      case '--':
+        break;
+
       case '-h':
       case '--help':
         opts.help = true;
@@ -185,6 +229,10 @@ function parseArgs(argv) {
 
       case '--seed':
         opts.seed = Number(consume());
+        break;
+
+      case '--now':
+        opts.now = parseNow(consume());
         break;
 
       case '--out-dir':
@@ -375,8 +423,15 @@ async function main() {
   const defs = loadDefs();
   const printer = createPrinter();
 
+  // Resolve the "now" anchor for all sample/report dates. When --now
+  // is omitted we fall back to the current wall-clock, which makes the
+  // run non-reproducible (timestamps drift between invocations). The
+  // resolved value is echoed below so a wall-clock run can be replayed
+  // byte-for-byte by passing it back via --now.
+  const now = opts.now ?? new Date();
+
   process.stdout.write(
-    `lab-pdf-gen: seed=${opts.seed} count=${opts.count} out=${outDir}\n`,
+    `lab-pdf-gen: seed=${opts.seed} count=${opts.count} now=${now.toISOString()} out=${outDir}\n`,
   );
   process.stdout.write(
     `lab-pdf-gen: panels=${opts.panels.join(',')} mix=unique:${opts.uniqueFrac.toFixed(2)} recurring=${opts.recurringMin}-${opts.recurringMax}\n`,
@@ -390,6 +445,7 @@ async function main() {
     recurringMin: opts.recurringMin,
     recurringMax: opts.recurringMax,
     panels: opts.panels,
+    now,
   });
   process.stdout.write(`lab-pdf-gen: planned ${shells.length} reports\n`);
 

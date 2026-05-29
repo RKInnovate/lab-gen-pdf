@@ -7,6 +7,10 @@ node_modules/
 test-sample/*
 !test-sample/.gitkeep
 
+# Output of `pnpm run generate:repro` — the pinned-seed/pinned-now
+# determinism check. Same throwaway status as test-sample/.
+test-sample-repro/
+
 # Vendored Devanagari TTFs MUST be committed so a fresh clone can
 # render the bilingual layout without network access. If any future
 # broad rule starts ignoring `assets/`, this negation keeps the TTFs
