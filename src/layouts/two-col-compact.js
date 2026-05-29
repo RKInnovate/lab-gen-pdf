@@ -307,14 +307,15 @@ export function patientBlock(report) {
   return {
     margin: [0, 4, 0, 6],
     table: {
-      // Six equal-width cells. '*' lets pdfmake distribute the 531pt
+      // Seven equal-width cells. '*' lets pdfmake distribute the 531pt
       // content width evenly, so we don't hand-tune widths per cell.
-      widths: ['*', '*', '*', '*', '*', '*'],
+      widths: ['*', '*', '*', '*', '*', '*', '*'],
       body: [
         [
           cell('Name', patient.name),
           cell('Age / Sex', `${patient.age} / ${sexWord}`),
           cell('Patient ID', patient.id),
+          cell('Mobile', patient.phone),
           cell('Reg', registrationId),
           cell('Sample', `${sampleId}  ${formatDate(sampleDate)}`),
           cell('Doctor', patient.referringDoctor),

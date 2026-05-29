@@ -468,10 +468,13 @@ export function patientBlock(report) {
     panelSpecimen,
   } = report;
 
-  // 3-row × 4-col grid. We intentionally use 3 rows (12 cells) rather
-  // than 4 — the spec says "4×4" but with 12 useful fields the 4th
-  // row would be entirely filler. Borders + ALL-CAPS labels are what
-  // sell the "form" look, not the row count per se.
+  // 3 four-column rows of patient/sample fields, plus a final
+  // full-width MOBILE row. The mobile number is a single field so we
+  // span it across all four columns with `colSpan: 4` (the trailing
+  // empty cells are required by pdfmake's colSpan contract) — that
+  // keeps the full black grid rectangular without padding the row
+  // with three filler fields. Borders + ALL-CAPS labels are what sell
+  // the "form" look, not the exact cell count.
   const sexLabel = patient.sex === 'F' ? 'Female' : 'Male';
   const body = [
     [
@@ -491,6 +494,12 @@ export function patientBlock(report) {
       gridCell('REPORT DATE', formatDateTime(reportDate)),
       gridCell('DEPARTMENT', panelDept),
       gridCell('SPECIMEN', panelSpecimen),
+    ],
+    [
+      { ...gridCell('MOBILE', patient.phone), colSpan: 4 },
+      {},
+      {},
+      {},
     ],
   ];
 

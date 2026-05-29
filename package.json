@@ -14,6 +14,7 @@
     "generate": "node src/index.js",
     "generate:smoke": "node src/index.js --count 20 --seed 42",
     "generate:full": "node src/index.js --count 2000 --seed 42",
+    "generate:repro": "node src/index.js --count 20 --seed 42 --now 2026-05-29T12:00:00Z --out-dir ./test-sample-repro",
     "setup:fonts": "mkdir -p assets/fonts && curl -fsSL -o assets/fonts/NotoSansDevanagari-Regular.ttf https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSansDevanagari/unhinted/ttf/NotoSansDevanagari-Regular.ttf && curl -fsSL -o assets/fonts/NotoSansDevanagari-Bold.ttf https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSansDevanagari/unhinted/ttf/NotoSansDevanagari-Bold.ttf && curl -fsSL -o assets/fonts/OFL.txt https://raw.githubusercontent.com/notofonts/devanagari/main/OFL.txt"
   },
   "dependencies": {

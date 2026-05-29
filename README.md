@@ -56,7 +56,14 @@ CLI flags:
 
 - `--count N` — total PDFs to emit (default 2000).
 - `--seed N` — deterministic RNG seed (default 42). Same seed →
-  same patient set, same dates, same values, same filenames.
+  same patient set, same values, same filenames.
+- `--now TIMESTAMP` — time anchor for all sample/report dates (epoch
+  ms or ISO-8601, e.g. `2026-05-29T12:00:00Z`). Defaults to the
+  current wall-clock. **Pin `--now` together with `--seed` for
+  byte-identical reruns** — every date and the PDF's embedded
+  `CreationDate`/`/ID` derive from it. The resolved value is printed
+  on startup (`now=<ISO>`), so an unpinned run can be replayed by
+  feeding that value back via `--now`.
 - `--out-dir PATH` — where the PDFs go (default `./test-sample`).
 - `--mix unique=0.7,recurring=0.3` — override the patient mix.
 - `--recurring-reports min=2,max=5` — override recurring patients'

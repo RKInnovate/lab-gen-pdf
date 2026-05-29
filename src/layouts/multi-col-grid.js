@@ -303,29 +303,34 @@ export function headerBlock(report) {
 export function patientBlock(report) {
   const { patient, sampleDate, reportDate, registrationId, sampleId } = report;
 
-  // 15 fields, column-major: column 1 rows 1-5, column 2 rows 1-5, column 3 rows 1-5.
-  // Padding placeholders below mirror typical Indian lab form fields so the
-  // grid looks lived-in rather than half-empty.
-  const fields = [
-    // Column 1 — patient identity
+  // Three columns, defined explicitly so they can have different
+  // lengths. The identity column carries the new Mobile field, making
+  // it one row longer than the other two; the reshape below pads the
+  // short columns with empty cells. Placeholders mirror typical Indian
+  // lab form fields so the grid looks lived-in rather than half-empty.
+  const identityCol = [
     ['Patient Name', patient.name],
     ['Age / Sex', `${patient.age} Y / ${patient.sex === 'F' ? 'F' : 'M'}`],
     ['Patient ID', patient.id],
     ['MRN', patient.mrn],
+    ['Mobile', patient.phone],
     ['Referring Dr.', patient.referringDoctor],
-    // Column 2 — sample / registration
+  ];
+  const sampleCol = [
     ['Registration ID', registrationId],
     ['Sample ID', sampleId],
     ['Sample Date', formatDateTime(sampleDate)],
     ['Report Date', formatDateTime(reportDate)],
     ['Collected By', 'Phlebotomy Desk'],
-    // Column 3 — sample state placeholders (lab-form padding)
+  ];
+  const stateCol = [
     ['Fasting Status', 'Not Specified'],
     ['Sample Condition', 'Satisfactory'],
     ['Specimen Type', report.panelSpecimen],
     ['Department', report.panelDept],
     ['Report Status', 'Final'],
   ];
+  const columns = [identityCol, sampleCol, stateCol];
 
   /**
    * Build one stacked label/value cell with the shared grey fill.
@@ -343,15 +348,16 @@ export function patientBlock(report) {
     margin: [3, 2, 3, 2],
   });
 
-  // Reshape 15 column-major fields into 5 rows of 3 cells each.
-  // fields[0..4] = col1, fields[5..9] = col2, fields[10..14] = col3.
+  // Reshape the three column arrays into rows, one cell per column.
+  // The row count is the longest column; a column that runs out of
+  // fields contributes an empty cell. Empty cells are invisible under
+  // the borderless layout, so the ragged tail reads as a clean grid.
+  const rowCount = Math.max(...columns.map((col) => col.length));
   const body = [];
-  for (let r = 0; r < 5; r += 1) {
-    body.push([
-      cell(fields[r][0], fields[r][1]),
-      cell(fields[r + 5][0], fields[r + 5][1]),
-      cell(fields[r + 10][0], fields[r + 10][1]),
-    ]);
+  for (let r = 0; r < rowCount; r += 1) {
+    body.push(
+      columns.map((col) => (col[r] ? cell(col[r][0], col[r][1]) : {})),
+    );
   }
 
   return {

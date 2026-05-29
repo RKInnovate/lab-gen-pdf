@@ -127,17 +127,28 @@ authoring guide.
 
 ## Determinism guarantee
 
-Same `--seed` → same patient set, same panel picks, same layout
-picks, same sample dates, same analyte values, same filenames,
-same bytes on disk. The discipline behind this is narrow:
+Same `--seed` **and** same `--now` → same patient set, same panel
+picks, same layout picks, same sample dates, same analyte values,
+same filenames, same bytes on disk. The discipline behind this is
+narrow:
 
+0. **Single time anchor threaded everywhere.** Every date the
+   generator emits — sample/report dates, the MRN year stamp, and the
+   PDF's embedded `CreationDate` — is derived from one `now` value.
+   The CLI resolves it from `--now` (epoch ms or ISO-8601), falling
+   back to the current wall-clock when the flag is omitted, and
+   threads it into `planReports` (which passes it to `buildPatient`)
+   and through `report.reportDate` into `renderOne`. No code on the
+   data or render path calls bare `new Date()` / `Date.now()` for a
+   value that reaches the page. Because the wall-clock fallback is
+   non-reproducible, the resolved anchor is echoed on startup
+   (`now=<ISO>`) so an unpinned run can be replayed via `--now`.
 1. **Single seeded RNG threaded everywhere.** `createRng(seed)` is
    called once in `src/index.js` and passed by reference to
    `planReports`, `fillReport`, `pickLayout`, `pickLab`, every
    `rng.weighted` / `rng.pick` / `rng.float` call site. Nothing in
-   the codebase calls `Math.random`, `crypto.randomUUID`,
-   `Date.now()` for a value that ends up on the page, or any other
-   non-seedable source.
+   the codebase calls `Math.random`, `crypto.randomUUID`, or any
+   other non-seedable source.
 2. **Hand-rolled date formatters.** Layouts format dates with a
    hand-rolled `pad2` + `MONTH_ABBREV` array, not
    `toLocaleDateString`. Locale-aware formatters vary across Node
@@ -154,13 +165,18 @@ same bytes on disk. The discipline behind this is narrow:
    semi-quantitatives (Negative / Trace / 1+ / 2+ ...) draw via
    `rng.pick` from the analyte's `options` list, not a fresh source.
 
-Side note: re-running with the same seed produces byte-identical PDFs
-only when pdfmake itself is byte-stable across runs. pdfmake@0.2.x
-is — it does not embed `Date.now()` into the PDF's `/CreationDate`
-field (it embeds a fixed epoch when no `info` is supplied), and its
-font subsetter is deterministic. If pdfmake's byte-stability changes
-in a future release, this property breaks and the determinism note
-on the README needs to be revisited.
+Side note — the PDF `CreationDate` / `/ID` trap: pdfkit (pdfmake's
+engine) defaults `info.CreationDate` to `new Date()` at **serialise**
+time, and derives the PDF's `/ID` trailer as an MD5 over the info
+dictionary (CreationDate included). Left alone, that makes every byte
+after the info dict — and the document identifier — differ on every
+run, even with `--seed` and `--now` fixed. `renderOne` closes this by
+setting `docDefinition.info.creationDate = report.reportDate` (a pure
+function of `--seed` + `--now`), which pins both the embedded date and
+the `/ID`. Beyond that, byte-stability also relies on pdfmake@0.2.x's
+font subsetter being deterministic (it is). If a future pdfmake
+release changes either behaviour, this property breaks and the
+determinism notes here and in the README need revisiting.
 
 ## Module reference
 
@@ -206,6 +222,7 @@ type Patient = {
   name: string;            // 'First [Middle] Last'
   age: number;             // integer, 6..92 inclusive, weighted toward 25..65
   sex: 'M' | 'F';
+  phone: string;           // '+91 98765 43210' — synthetic Indian mobile
   referringDoctor: string; // 'Dr. <Name>, <quals>'
   lab: LabBranding;
 };

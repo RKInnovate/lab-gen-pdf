@@ -22,9 +22,15 @@
  * # Determinism
  * All randomness flows through a `createRng` instance supplied by
  * the caller. Same seed in → same shells out, in the same order,
- * with the same patient IDs and timestamps. The downstream
- * `fillReport` step is similarly seeded so the whole pipeline is
- * reproducible end-to-end.
+ * with the same patient IDs. The downstream `fillReport` step is
+ * similarly seeded so the whole pipeline is reproducible end-to-end.
+ *
+ * Timestamps additionally depend on the `now` anchor the caller
+ * passes (the CLI's `--now` flag): every sample/report date and the
+ * MRN year stamp are derived from `now`, so pin BOTH `--seed` and
+ * `--now` for byte-identical reruns. When `now` is omitted it
+ * defaults to the current wall-clock, which makes the timestamps —
+ * and therefore the output bytes — drift between invocations.
  *
  * # Why hard-coded name/doctor pools
  * The generator is self-contained on purpose — no extra deps, no
@@ -119,13 +125,14 @@ const MIN_VISIT_GAP_MS = 14 * 24 * 60 * 60 * 1000;
  * @param {ReturnType<import('../seedrand.js').createRng>} args.rng
  * @param {number} args.sequence - monotonically increasing patient counter, used for the P-XXXXXX id
  * @param {object} args.lab - lab branding object from `LABS`
+ * @param {Date} args.now - reference "now"; supplies the MRN year stamp so it stays reproducible per `--now`
  * @returns {{
  *   id: string, mrn: string, name: string,
- *   age: number, sex: 'M'|'F',
+ *   age: number, sex: 'M'|'F', phone: string,
  *   referringDoctor: string, lab: object
  * }}
  */
-function buildPatient({ rng, sequence, lab }) {
+function buildPatient({ rng, sequence, lab, now }) {
   const sex = rng.bool(0.5) ? 'M' : 'F';
   const firstPool = sex === 'M' ? MALE_FIRST_NAMES : FEMALE_FIRST_NAMES;
   const first = rng.pick(firstPool);
@@ -148,10 +155,16 @@ function buildPatient({ rng, sequence, lab }) {
 
   // MRN is lab-scoped. The 7-digit suffix is drawn fresh per
   // patient — collisions across labs are fine because the lab slug
-  // namespaces them.
-  const year = new Date().getFullYear();
+  // namespaces them. The year comes from the `now` anchor (not a live
+  // `new Date()`) so the MRN stays reproducible under a pinned --now.
+  const year = now.getFullYear();
   const mrnSuffix = String(rng.int(1, 9999999)).padStart(7, '0');
   const mrn = `${lab.slug}/MRN/${year}/${mrnSuffix}`;
+
+  // Contact mobile. Real Indian lab reports print a patient mobile in
+  // the demographics block; drawn from the seeded RNG so it stays
+  // reproducible per seed like every other field.
+  const phone = buildPhone(rng);
 
   return {
     id,
@@ -159,9 +172,40 @@ function buildPatient({ rng, sequence, lab }) {
     name,
     age,
     sex,
+    phone,
     referringDoctor: rng.pick(REFERRING_DOCTORS),
     lab,
   };
+}
+
+/**
+ * Build a synthetic Indian mobile number for a patient.
+ *
+ * Indian mobile numbers are exactly 10 digits and always begin with
+ * 6, 7, 8, or 9 (the TRAI mobile-prefix range); other series are
+ * landlines and never appear in a patient contact field. We format
+ * with the +91 country code and 5-5 digit grouping
+ * (`+91 98765 43210`) because that is the most common way the contact
+ * line is printed on Indian lab reports.
+ *
+ * All digits are drawn from the supplied seeded RNG so the value is
+ * reproducible for a given `--seed`, same as every other patient
+ * field. Never use `Math.random` here — it would silently break the
+ * deterministic "same seed ⇒ same bytes" contract.
+ *
+ * @param {ReturnType<import('../seedrand.js').createRng>} rng
+ * @returns {string} formatted mobile, e.g. '+91 98765 43210'
+ */
+function buildPhone(rng) {
+  // First digit constrained to the valid Indian mobile prefix range.
+  const digits = [String(rng.pick([6, 7, 8, 9]))];
+  for (let i = 0; i < 9; i += 1) {
+    digits.push(String(rng.int(0, 9)));
+  }
+  const joined = digits.join('');
+  // 5-5 grouping after the +91 country code, matching how the number
+  // is printed on most Indian lab stationery.
+  return `+91 ${joined.slice(0, 5)} ${joined.slice(5)}`;
 }
 
 /**
@@ -266,6 +310,7 @@ function randomSampleAndReportDate(rng, now) {
  * @param {number} args.recurringMax - maximum reports per recurring patient (inclusive)
  * @param {string[]} args.panels - allowed panel slugs across the 8 known panels (e.g. ['cbc','lipid','lft','thyroid','kft','hba1c','iron','urine'])
  * @param {Record<string, number>} [args.panelWeights] - relative weights for panel selection; defaults to {cbc:4, lipid:3, lft:2, thyroid:2, kft:2, hba1c:3, iron:1, urine:2}
+ * @param {Date} [args.now] - reference "now" all sample/report dates are measured back from; defaults to the current wall-clock. Pin it (via the CLI's --now) together with the seed for byte-identical reruns.
  * @returns {Array<object>} report shells (see file header for shape)
  */
 export function planReports({
@@ -276,9 +321,9 @@ export function planReports({
   recurringMax,
   panels,
   panelWeights,
+  now = new Date(),
 }) {
   const weights = panelWeights ?? DEFAULT_PANEL_WEIGHTS;
-  const now = new Date();
   const shells = [];
 
   // Sequence counters live outside the loops so unique + recurring
@@ -292,7 +337,7 @@ export function planReports({
   // -- Pass 1: unique walk-ins --
   for (let i = 0; i < uniqueCount; i += 1) {
     const lab = pickLab(rng);
-    const patient = buildPatient({ rng, sequence: patientSequence, lab });
+    const patient = buildPatient({ rng, sequence: patientSequence, lab, now });
     patientSequence += 1;
 
     const panel = pickPanel(rng, panels, weights);
@@ -331,7 +376,7 @@ export function planReports({
     const visitCount = desired;
 
     const lab = pickLab(rng);
-    const patient = buildPatient({ rng, sequence: patientSequence, lab });
+    const patient = buildPatient({ rng, sequence: patientSequence, lab, now });
     patientSequence += 1;
 
     const preferredPanel = pickPanel(rng, panels, weights);

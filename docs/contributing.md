@@ -324,15 +324,24 @@ prefixes (see `README.md` § "Why this exists").
 
 ## 10. Determinism is load-bearing
 
-Re-running the generator with the same `--seed` **must** produce
-byte-identical PDFs. The downstream consumer (`labsense-agent`)
-uses SHA-256 dedup as its primary contract; the agent's dedup
-test depends on this property holding.
+Re-running the generator with the same `--seed` **and** the same
+`--now` **must** produce byte-identical PDFs. The downstream consumer
+(`labsense-agent`) uses SHA-256 dedup as its primary contract; the
+agent's dedup test depends on this property holding.
+
+`--now` is the time anchor: every sample/report date, the MRN year
+stamp, and the PDF's embedded `CreationDate` (and hence its `/ID`
+trailer) are derived from it. When `--now` is omitted it defaults to
+the current wall-clock, so the timestamps — and the output bytes —
+drift between invocations. The CLI echoes the resolved value
+(`now=<ISO>`) on startup, so a wall-clock run can be replayed
+byte-for-byte by feeding that value back via `--now`.
 
 Anything that quietly breaks determinism is a regression:
 
 - `Date.prototype.toLocaleDateString` (reads host ICU)
-- `Date.now()` anywhere in a render path
+- `new Date()` / `Date.now()` anywhere downstream of the `now` anchor
+  — thread `now` through instead (see `planReports` / `renderOne`)
 - `Math.random()` anywhere downstream of `createRng`
 - iteration over an unordered `Object.entries` / `Set` / `Map`
   whose insertion order depends on input order (rare, but watch
@@ -340,18 +349,19 @@ Anything that quietly breaks determinism is a regression:
 - timezone-sensitive `Date` arithmetic — keep dates pinned in UTC
   or in the formatter's hand-rolled output
 
-If you suspect a regression, run:
+If you suspect a regression, run (note the pinned `--now`):
 
 ```bash
-pnpm run generate:smoke
-sha256sum test-sample/*.pdf > /tmp/run1.txt
-rm -rf test-sample
-pnpm run generate:smoke
-sha256sum test-sample/*.pdf > /tmp/run2.txt
+node src/index.js --count 20 --seed 42 --now 2026-05-29T12:00:00Z --out-dir /tmp/run1
+sha256sum /tmp/run1/*.pdf | awk '{print $1}' > /tmp/run1.txt
+node src/index.js --count 20 --seed 42 --now 2026-05-29T12:00:00Z --out-dir /tmp/run2
+sha256sum /tmp/run2/*.pdf | awk '{print $1}' > /tmp/run2.txt
 diff /tmp/run1.txt /tmp/run2.txt
 ```
 
-The diff must be empty.
+The diff must be empty. (Omitting `--now` from both runs will *not*
+produce an empty diff — that is expected, since each run then anchors
+to a different wall-clock instant.)
 
 ---
 

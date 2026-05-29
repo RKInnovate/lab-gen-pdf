@@ -49,6 +49,14 @@
  *   outside `[A-Za-z0-9._-]` is replaced with `-` defensively, since
  *   patient/lab data shouldn't contain such characters but we'd
  *   rather not blow up on a stray slash if the data layer changes.
+ *
+ * - **Pinned PDF CreationDate for byte-determinism.** `renderOne`
+ *   sets `docDefinition.info.creationDate` to `report.reportDate`.
+ *   Without it, pdfkit defaults the creation timestamp to `new Date()`
+ *   at serialise time and derives the PDF `/ID` trailer as an MD5 over
+ *   the info dict — so the bytes (and the file identifier) would
+ *   differ every run even with `--seed` and `--now` fixed. See the
+ *   inline note in `renderOne` for the full rationale.
  */
 
 import fs from 'fs';
@@ -363,6 +371,24 @@ function makeFilename(report) {
 export async function renderOne(report, outDir, printer) {
   const buildDocDefinition = templateFor(report.panel);
   const docDefinition = buildDocDefinition(report);
+
+  // Pin the PDF's CreationDate to the (already deterministic) report
+  // date. This is the last piece of byte-level determinism: pdfkit
+  // otherwise defaults `info.CreationDate` to `new Date()` at
+  // serialise time, and — critically — it derives the PDF's `/ID`
+  // trailer as an MD5 over the info dictionary (CreationDate
+  // included). An unpinned date therefore changes BOTH the embedded
+  // creation timestamp and the document identifier on every run,
+  // which breaks the agent's SHA-256 dedup contract even when --seed
+  // and --now are fixed. `report.reportDate` is a pure function of
+  // --seed + --now and is the natural "issued at" moment, so using it
+  // makes the whole file reproducible. (pdfmake lowercases the info
+  // keys and maps `creationDate` → the PDF `CreationDate` field.)
+  docDefinition.info = {
+    ...docDefinition.info,
+    creationDate: report.reportDate,
+  };
+
   const filename = makeFilename(report);
   const fullPath = path.resolve(outDir, filename);
 
