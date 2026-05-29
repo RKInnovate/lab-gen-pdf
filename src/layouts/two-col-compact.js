@@ -9,8 +9,19 @@
  * wide results table, this layout aggressively compresses every
  * region: tighter page margins, smaller default font (8 instead of 9),
  * a one-row patient strip rather than a two-side label/value grid,
- * and — the signature element — a TWO-COLUMN flow of dot-leader
- * result lines instead of a tabular grid.
+ * and — the signature element — a full-width flow of dot-leader
+ * result lines (`name ···· value (range) [flag]`) instead of a
+ * tabular grid.
+ *
+ * The "two-column" in the layout key is historical: results were once
+ * split into two side-by-side sub-columns, but pdfmake resolves a
+ * nested table's `'*'` width against the PAGE width rather than the
+ * parent sub-column, so the dots+value of the right half spilled off
+ * the page on dense panels (CBC's leukocyte group). Results now render
+ * as one full-width column, which keeps every dot-leader table at top
+ * level (where `'*'` resolves correctly) and still fits a full CBC on
+ * one page at this layout's tight margins. The `'two-col-compact'`
+ * layout key is unchanged so report-to-layout assignment stays stable.
  *
  * # Role in the pipeline
  *   generators/* ──▶ Report (layoutKey: 'two-col-compact') ──▶ panel template
@@ -40,24 +51,25 @@
  *   address/phone/email as a single inline row on the right. A 0.5pt accent
  *   rule sits under the whole header. Saving the monogram square buys ~30pt
  *   of vertical space, which is worth it for an OPD layout.
- * - Patient block: ONE horizontal strip, 6 cells, light grey
- *   (`#F8F8F8`) background, with thin vertical separators between cells but
- *   no outer border. pdfmake quirk: the cleanest way to get cell-only
- *   vertical rules is a custom `layout` function returning a `vLineWidth`
- *   that is 0.5 for *interior* lines and 0 for left/right (and all hLines).
+ * - Patient block: ONE horizontal strip, 7 cells (Name, Age/Sex, Patient
+ *   ID, Mobile, Reg, Sample, Doctor), light grey (`#F8F8F8`) background,
+ *   with thin vertical separators between cells but no outer border.
+ *   pdfmake quirk: the cleanest way to get cell-only vertical rules is a
+ *   custom `layout` function returning a `vLineWidth` that is 0.5 for
+ *   *interior* lines and 0 for left/right (and all hLines).
  * - Panel title bar: minimalist — no fill, just `{panelTitle}` accent-bold
  *   on the left and `{panelDept} · {panelSpecimen}` italic on the right,
  *   on a single line, with a thin accent rule under.
- * - Results: rendered as TWO pdfmake columns. `groupedResults` is split by
- *   alternation (even-indexed groups → column A, odd-indexed → column B)
- *   so two visually-heavy groups don't pile on one side. Each row inside
- *   a column is a borderless 4-column table — `name | dots | result | flag`.
- *   The 4-col-table approach is chosen over `preserveLeadingSpaces` + a
- *   hand-built dot string because pdfmake's text-wrapping in `columns`
- *   makes the latter unreliable: a wrapped name would push the dots onto
- *   their own line, breaking the dot-leader illusion. The dots column is
- *   `*`-width so it always exactly fills the gap between name and result
- *   regardless of the half-width of the parent column.
+ * - Results: a single full-width column (see the Purpose note on why the
+ *   former two-column split was dropped). `groupedResults` render in
+ *   declaration order, each group introduced by an accent sub-header and
+ *   a faint full-width rule. Each row is a borderless 4-column table —
+ *   `name | dots | result-and-range-and-flag | pad`. The table approach
+ *   is chosen over `preserveLeadingSpaces` + a hand-built dot string
+ *   because pdfmake's text-wrapping makes the latter unreliable: a
+ *   wrapped name would push the dots onto their own line, breaking the
+ *   dot-leader illusion. The dots column is `*`-width so it always
+ *   exactly fills the gap between name and result across the full page.
  * - Endorsement: compact 2-line block right-aligned. Disclaimer is a single
  *   italic sentence (versus corporate-clean's 5-line paragraph).
  * - Footer: a single small centred line — `lab-name · page X/Y · synthetic
@@ -264,10 +276,10 @@ export function headerBlock(report) {
 /**
  * Build the compact horizontal patient strip:
  *
- *   ┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
- *   │ Name    │ Age/Sex │ Pat. ID │ Reg     │ Sample  │ Doctor  │
- *   │ Sita... │ 34 / F  │ P0001   │ R0001   │ S0001   │ Dr. ... │
- *   └─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+ *   ┌────────┬─────────┬────────┬──────────┬───────┬────────┬────────┐
+ *   │ Name   │ Age/Sex │ Pat.ID │ Mobile   │ Reg   │ Sample │ Doctor │
+ *   │ Sita...│ 34 / F  │ P0001  │ +91 ...  │ R0001 │ S0001  │ Dr. ...│
+ *   └────────┴─────────┴────────┴──────────┴───────┴────────┴────────┘
  *
  * Light grey fill, no outer border, thin vertical separators between cells.
  *
@@ -509,13 +521,13 @@ function dotLeaderRow(row) {
 }
 
 /**
- * Build a column of group sub-blocks. Each group within the column gets a
- * small accent-coloured uppercase sub-header with a faint bottom rule,
- * followed by its rows as dot-leader lines.
+ * Build the stack of group sub-blocks for the (single, full-width) results
+ * column. Each group gets a small accent-coloured uppercase sub-header with
+ * a faint full-width rule, followed by its rows as dot-leader lines.
  *
  * @param {Array<{name: string, rows: Array<object>}>} groups
  * @param {string} accentColor — `report.patient.lab.accentColor`
- * @returns {Array<object>} pdfmake content nodes ready to nest under a column
+ * @returns {Array<object>} pdfmake content nodes ready to nest under a stack
  */
 function buildColumnStack(groups, accentColor) {
   const out = [];
@@ -538,10 +550,8 @@ function buildColumnStack(groups, accentColor) {
           type: 'line',
           x1: 0,
           y1: 0,
-          // Half of content width (531/2 ≈ 265) minus a small inner gutter
-          // (5pt). pdfmake's `columns` adds a default 5pt gap between
-          // columns, so the rule should not span the whole 265.
-          x2: 255,
+          // Full printable content width: A4 595pt - left 32 - right 32.
+          x2: 531,
           y2: 0,
           lineWidth: 0.25,
           lineColor: '#DDDDDD',
@@ -558,14 +568,16 @@ function buildColumnStack(groups, accentColor) {
 }
 
 /**
- * Build the results region as a TWO-COLUMN flow of dot-leader rows.
+ * Build the results region as a single full-width flow of dot-leader rows,
+ * groups stacked in declaration order.
  *
- * Distribution rule: groups are split by index parity — even-indexed
- * groups (0, 2, 4, …) go to column A, odd-indexed (1, 3, 5, …) go to
- * column B. This deliberately interleaves: if column A and column B were
- * filled in halves (first half / second half of `groupedResults`), the
- * dense groups (CBC's "RBC Indices") would all pile on one side. Alternation
- * keeps the visual weight balanced.
+ * This was once a two-column (index-parity) split, but pdfmake resolves a
+ * nested table's `'*'` column against the PAGE width rather than the parent
+ * sub-column, so on dense panels (CBC) the right half's dots and values
+ * spilled across and off the page. A single full-width column keeps each
+ * dot-leader table at top level — where `'*'` resolves correctly — and a
+ * full CBC still fits on one page at this layout's 8pt font and tight
+ * margins. See the file-header Purpose note for the full rationale.
  *
  * Note on the function's name: we keep it as `resultsTable` for symmetry
  * with the layout interface, even though this layout renders the results
@@ -578,30 +590,19 @@ function buildColumnStack(groups, accentColor) {
 export function resultsTable(report) {
   const accent = report.patient.lab.accentColor;
 
-  // Split groups by index parity. We keep the original group order within
-  // each column (so the panel's first group still appears first in column A).
-  const colAGroups = [];
-  const colBGroups = [];
-  report.groupedResults.forEach((g, idx) => {
-    if (idx % 2 === 0) colAGroups.push(g);
-    else colBGroups.push(g);
-  });
-
+  // Single full-width column of dot-leader rows, groups stacked in
+  // declaration order. We deliberately do NOT split into two pdfmake
+  // sub-columns: each dot-leader row is a table whose dots column is
+  // `'*'`, and pdfmake resolves a nested table's `'*'` against the PAGE
+  // width rather than the parent sub-column it sits in — so a two-column
+  // split makes the dots+value of one side spill across the page and
+  // overlap or run off the right edge. Rendering one full-width column
+  // keeps every dot-leader table at top level (where `'*'` resolves
+  // correctly), and still fits a full CBC on a single page at this
+  // layout's tight margins and 8pt font.
   return {
     margin: [0, 2, 0, 4],
-    columns: [
-      {
-        width: '*',
-        stack: buildColumnStack(colAGroups, accent),
-      },
-      {
-        width: '*',
-        stack: buildColumnStack(colBGroups, accent),
-      },
-    ],
-    // pdfmake `columns` default gutter is 0pt; we add an explicit gap so
-    // the dot-leader rows in column A and column B don't visually touch.
-    columnGap: 14,
+    stack: buildColumnStack(report.groupedResults, accent),
   };
 }
 

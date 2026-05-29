@@ -92,9 +92,15 @@ directly.
 
 - **Visual goal.** Screening-clinic / OPD-quick-print. The whole CBC fits
   on a single A4 sheet.
-- **Design signature.** Results are rendered as **dot-leader rows in a
-  two-column pdfmake flow** instead of a tabular grid. Even-indexed groups
-  go to column A, odd-indexed to column B (`src/layouts/two-col-compact.js:51-60`).
+- **Design signature.** Results are rendered as **full-width dot-leader
+  rows** (`name ···· value (range) [flag]`) instead of a tabular grid,
+  groups stacked in declaration order (`src/layouts/two-col-compact.js`).
+  The `two-col-compact` key is historical: results were once split into
+  two side-by-side sub-columns, but pdfmake resolves a nested table's
+  `*` width against the page (not the parent sub-column), so dense panels
+  (CBC's leukocyte group) spilled off the right edge. Rendering one
+  full-width column keeps each dot-leader table at top level — where `*`
+  resolves correctly — and a full CBC still fits on one page.
 - **Best for stress-testing.** OCR pipelines that assume a single
   top-to-bottom results table. Dot leaders also confuse naive
   column-position parsers — the dots are a separate table column, not
@@ -102,9 +108,8 @@ directly.
 - **Notable decisions.** Page margins `[32, 60, 32, 50]` and default
   fontSize 8 with `lineHeight: 1.1` (the tightest pdfmake renders without
   glyph clipping on Roboto). Dot leaders are implemented as a 4-column
-  borderless table (`name | dots | result | flag`) because
-  `preserveLeadingSpaces` + hand-built dot strings break on text-wrap
-  (`src/layouts/two-col-compact.js:53-60`).
+  borderless table (`name | dots | result | pad`) because
+  `preserveLeadingSpaces` + hand-built dot strings break on text-wrap.
 
 ### `letterhead-minimal`
 
